@@ -50,3 +50,6 @@ Frontend/trace.json
 Frontend/stats*.json
 Frontend/stats.json
 trace.json
+Frontend/stats-final.json
+Frontend/stats-final-v2.json
+Frontend/stats-latest.json
