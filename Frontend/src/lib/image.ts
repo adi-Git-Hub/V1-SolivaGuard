@@ -15,7 +15,7 @@ import { env } from "@/config/env";
 export const FALLBACK_IMAGE = "/placeholder.svg";
 
 function apiOrigin(): string {
-  // VITE_API_URL is e.g. http://localhost:5000/api/v1 → strip the /api/v1 suffix.
+  // VITE_API_URL is e.g. https://solivaguard.com/api/v1 → strip the /api/v1 suffix.
   return env.VITE_API_URL.replace(/\/api\/v\d+\/?$/, "");
 }
 

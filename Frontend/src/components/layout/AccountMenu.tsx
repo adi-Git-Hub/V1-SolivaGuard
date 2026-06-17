@@ -20,7 +20,7 @@ import { useSession } from "@/features/auth/hooks/useSession";
 import { useLogout } from "@/features/auth/api";
 import { useIsMobile } from "@/design-system";
 
-const WHATSAPP_URL = "https://wa.me/917350640608";
+const WHATSAPP_URL = "https://wa.me/919479737209";
 const SUPPORT_EMAIL = "support@soliva.in";
 
 type Action = { icon: typeof User; label: string; to: string };
@@ -44,6 +44,13 @@ export function AccountMenu() {
     return () => window.removeEventListener("keydown", onKey);
   }, [open]);
 
+  // Loading state skeleton
+  if (session === undefined) {
+    return (
+      <div className="h-10.5 w-10.5 animate-pulse rounded-full bg-white/10" />
+    );
+  }
+
   const firstName = session?.user?.name?.trim().split(/\s+/)[0];
 
   const actions: Action[] = session
@@ -63,11 +70,16 @@ export function AccountMenu() {
       ];
 
   const triggerClass = session
-    ? "rounded-full outline-none transition-all hover:opacity-85 focus-visible:ring-2 focus-visible:ring-orange-glow/30"
+    ? "flex h-10.5 items-center gap-3 rounded-full outline-none transition-all hover:opacity-85 focus-visible:ring-2 focus-visible:ring-orange-glow/30"
     : "flex h-10.5 px-4 items-center justify-center gap-2.5 rounded-full text-white/90 hover:text-white hover:bg-white/10 transition-all outline-none";
 
   const trigger = session ? (
-    <Avatar src={session.user.avatarUrl} name={session.user.name} size={44} />
+    <>
+      <span className="grid place-items-center rounded-full ring-2 ring-white/30 transition-all duration-300 hover:ring-white/60 hover:shadow-[0_0_0_4px_rgba(255,255,255,0.12),0_6px_18px_-6px_rgba(124,45,18,0.5)]">
+        <Avatar src={session.user.avatarUrl} name={session.user.name} size={36} />
+      </span>
+      <span className="hidden lg:inline text-[13px] font-medium tracking-tight text-white">Profile</span>
+    </>
   ) : (
     <>
       <User className="h-[18px] w-[18px]" />
@@ -131,23 +143,16 @@ export function AccountMenu() {
           Need Help?
         </p>
         <div className="flex flex-col gap-2.5">
-          <a
-            href={WHATSAPP_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={close}
-            className="flex items-center gap-2.5 text-[0.8rem] font-medium text-brown-deep/80 transition-colors hover:text-brown-deep"
-          >
-            <MessageCircle className="h-4 w-4 text-[#25D366]" />
-            WhatsApp Support
-          </a>
           <Link
-            to="/support"
+            to="/contact"
             onClick={close}
-            className="flex items-center gap-2.5 text-[0.8rem] font-medium text-brown-deep/80 transition-colors hover:text-brown-deep"
+            className="group flex items-center justify-between gap-2.5 rounded-xl border border-[#c76600]/10 bg-[#c76600]/[0.02] px-3.5 py-3 text-[0.85rem] font-semibold text-[#c76600] transition-all hover:bg-[#c76600]/0.05 hover:shadow-sm active:scale-[0.98]"
           >
-            <Mail className="h-4 w-4 text-[#c76600]/70" />
-            Support Center →
+            <div className="flex items-center gap-2.5">
+              <MessageCircle className="h-4 w-4" />
+              Contact Us
+            </div>
+            <ChevronRight className="h-3.5 w-3.5 transition-transform duration-300 group-hover:translate-x-0.5" />
           </Link>
         </div>
       </div>

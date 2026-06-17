@@ -42,3 +42,11 @@ pids
 *.pid
 *.seed
 *.pid.lock
+.gstack/
+
+# Firebase service-account private keys (never commit)
+*firebase-adminsdk*.json
+Frontend/trace.json
+Frontend/stats*.json
+Frontend/stats.json
+trace.json

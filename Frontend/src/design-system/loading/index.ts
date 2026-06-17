@@ -7,6 +7,7 @@
 
 export { AppLoader } from "./AppLoader";
 export { TopProgressBar } from "./TopProgressBar";
+export { RouteTransitionLoader } from "./RouteTransitionLoader";
 export { SectionLoader } from "./SectionLoader";
 export { ImageLoader } from "./ImageLoader";
 export { SkeletonCard } from "./SkeletonCard";

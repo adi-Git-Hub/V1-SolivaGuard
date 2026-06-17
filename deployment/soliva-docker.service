@@ -1,0 +1,14 @@
+[Unit]
+Description=Soliva Docker Infrastructure
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/root/Aditya/the-final-Soliva/Backend
+ExecStart=/usr/bin/docker-compose up -d mongo redis
+ExecStop=/usr/bin/docker-compose stop mongo redis
+
+[Install]
+WantedBy=multi-user.target

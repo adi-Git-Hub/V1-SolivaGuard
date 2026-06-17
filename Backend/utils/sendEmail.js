@@ -77,6 +77,10 @@ const sendEmail = async (options) => {
     subject: options.subject,
     html: options.html,
   };
+  if (options.replyTo) message.replyTo = options.replyTo;
+  if (Array.isArray(options.attachments) && options.attachments.length) {
+    message.attachments = options.attachments;
+  }
 
   let lastErr;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {

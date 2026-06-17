@@ -53,7 +53,7 @@ function AdminDashboardRoute() {
             <Stat
               icon={Wallet}
               label="Revenue (paid)"
-              value={formatMoney(Math.round(stats.totalRevenue * 100), "USD")}
+              value={formatMoney(Math.round(stats.totalRevenue * 100), "INR")}
             />
           </section>
 
@@ -91,7 +91,7 @@ function AdminDashboardRoute() {
                           </span>
                         </td>
                         <td className="px-4 py-3 text-right font-medium">
-                          {formatMoney(Math.round(o.totalPrice * 100), "USD")}
+                          {formatMoney(Math.round(o.totalPrice * 100), "INR")}
                         </td>
                         <td className="px-4 py-3 text-right text-muted-foreground text-[11px]">
                           {new Date(o.createdAt).toLocaleString()}

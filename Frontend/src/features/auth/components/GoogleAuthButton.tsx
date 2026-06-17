@@ -3,7 +3,6 @@ import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 
-import { signInWithGooglePopup } from "@/lib/firebase";
 import { useGoogleAuth } from "../api";
 
 /** Multicolour Google "G" — crisp at any size, no external asset. */
@@ -56,6 +55,7 @@ export function GoogleAuthButton({
     if (loading) return;
     setLoading(true);
     try {
+      const { signInWithGooglePopup } = await import("@/lib/firebase");
       const idToken = await signInWithGooglePopup();
       await googleAuth.mutateAsync(idToken);
       toast.success("Welcome to Soliva");

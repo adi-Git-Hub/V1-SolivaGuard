@@ -16,7 +16,12 @@ const orderValidator = {
         price: z.number().positive('Item price must be positive'),
         quantity: z.number().int().positive('Item quantity must be at least 1'),
         image: z.string().url('Invalid item image URL'),
-        product: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid Product ID'),
+        // The storefront sells showcase items (e.g. "soliva-sunwrap") that have
+        // no catalogue Product document. orderService.createOrder() is built to
+        // tolerate non-ObjectId refs and mints a synthetic ObjectId for them, so
+        // accept any non-empty product reference here instead of forcing a
+        // 24-hex ObjectId (which silently broke checkout for showcase products).
+        product: z.string().min(1, 'Product reference is required'),
       })).min(1, 'Order must have at least one item'),
       itemsPrice: z.number().min(0),
       taxPrice: z.number().min(0),

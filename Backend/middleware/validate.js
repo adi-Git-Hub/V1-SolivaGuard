@@ -15,7 +15,7 @@ const validate = (schema) => (req, res, next) => {
     next();
   } catch (error) {
     if (error instanceof ZodError) {
-      const formattedErrors = error.errors.map((err) => ({
+      const formattedErrors = (error.errors || error.issues || []).map((err) => ({
         field: err.path.slice(1).join('.'), // Remove 'body', 'query', or 'params' from path
         message: err.message,
       }));

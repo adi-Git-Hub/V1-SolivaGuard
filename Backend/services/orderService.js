@@ -45,23 +45,44 @@ class OrderService {
 
       const { shippingInfo, orderItems, itemsPrice, taxPrice, shippingPrice, totalPrice } = data;
 
+      // The storefront sells a showcase product (SunWrap) that has no Product
+      // document in the catalogue. Enforce stock only for real catalogue
+      // products (valid ObjectIds that exist); tolerate showcase items so
+      // checkout/payment still works. Each line keeps its denormalized
+      // name/price/image and gets a synthetic product ref when it isn't a real
+      // catalogue product.
+      const safeOrderItems = [];
       for (const item of orderItems) {
-        const product = await Product.findOneAndUpdate(
-          { _id: item.product, stock: { $gte: item.quantity } },
-          { $inc: { stock: -item.quantity } },
-          { new: true, ...sessionOpt }
-        );
+        let productRef = item.product;
 
-        if (!product) {
-          throw new ErrorHandler(`Product ${item.name} is out of stock or insufficient quantity`, 400);
+        if (mongoose.Types.ObjectId.isValid(productRef)) {
+          const product = await Product.findOneAndUpdate(
+            { _id: productRef, stock: { $gte: item.quantity } },
+            { $inc: { stock: -item.quantity } },
+            { new: true, ...sessionOpt }
+          );
+
+          if (!product) {
+            const exists = await Product.exists({ _id: productRef });
+            if (exists) {
+              throw new ErrorHandler(`Product ${item.name} is out of stock or insufficient quantity`, 400);
+            }
+            // Valid-looking id but no such product → treat as a showcase item.
+            productRef = new mongoose.Types.ObjectId();
+          }
+        } else {
+          // Not a real ObjectId (e.g. "soliva-sunwrap") → showcase item.
+          productRef = new mongoose.Types.ObjectId();
         }
+
+        safeOrderItems.push({ ...item, product: productRef });
       }
 
       const razorpayOrder = await paymentService.createRazorpayOrder(totalPrice);
 
       const orderData = {
         shippingInfo,
-        orderItems,
+        orderItems: safeOrderItems,
         itemsPrice,
         taxPrice,
         shippingPrice,

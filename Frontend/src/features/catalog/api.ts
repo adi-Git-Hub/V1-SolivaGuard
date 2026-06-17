@@ -61,7 +61,7 @@ function normalizeProduct(raw: RawProduct): Product {
     priceCents: Math.round(Number(raw.price ?? 0) * 100),
     compareAtCents:
       raw.compareAtPrice != null ? Math.round(Number(raw.compareAtPrice) * 100) : null,
-    currency: raw.currency || "USD",
+    currency: raw.currency || "INR",
     images,
     categoryId: category,
     categorySlug: category.toLowerCase(),

@@ -13,6 +13,7 @@ import {
   X
 } from "lucide-react";
 import { useSession } from "@/features/auth/hooks/useSession";
+import { env } from "@/config/env";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -147,6 +148,8 @@ function SupportPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [category, setCategory] = useState<string>("");
+  const [subject, setSubject] = useState("");
+  const [message, setMessage] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [guestName, setGuestName] = useState("");
   const [guestEmail, setGuestEmail] = useState("");
@@ -155,13 +158,31 @@ function SupportPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    
-    // Simulate API call for premium experience
-    await new Promise((resolve) => setTimeout(resolve, 2500));
-    
-    setIsSubmitting(false);
-    setIsSuccess(true);
-    toast.success("Message sent successfully!");
+    try {
+      const fd = new FormData();
+      fd.append("name", session?.user?.name || guestName);
+      fd.append("email", session?.user?.email || guestEmail);
+      fd.append("subject", subject);
+      fd.append("category", category);
+      fd.append("message", message);
+      files.forEach((f) => fd.append("attachments", f));
+
+      const res = await fetch(`${env.VITE_API_URL}/contact/feedback`, {
+        method: "POST",
+        body: fd,
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || "Could not send your feedback");
+      }
+      setIsSuccess(true);
+      toast.success("Your feedback reached us successfully!");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not send your feedback. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -297,9 +318,11 @@ function SupportPage() {
               {/* Subject */}
               <div className="space-y-2">
                 <Label className="text-[0.7rem] font-bold uppercase tracking-wider text-ink-muted">Subject</Label>
-                <Input 
-                  placeholder="Brief summary of your issue" 
+                <Input
+                  placeholder="Brief summary of your issue"
                   required
+                  value={subject}
+                  onChange={(e) => setSubject(e.target.value)}
                   className="h-14 rounded-2xl border-line-hairline bg-transparent text-[0.9rem] placeholder:text-ink-disabled focus:ring-orange-glow/20"
                 />
               </div>
@@ -307,9 +330,11 @@ function SupportPage() {
               {/* Message */}
               <div className="space-y-2">
                 <Label className="text-[0.7rem] font-bold uppercase tracking-wider text-ink-muted">Message</Label>
-                <Textarea 
-                  placeholder="Tell us how we can help..." 
+                <Textarea
+                  placeholder="Tell us how we can help..."
                   required
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
                   className="min-h-[160px] resize-none rounded-2xl border-line-hairline bg-transparent p-5 text-[0.9rem] placeholder:text-ink-disabled focus:ring-orange-glow/20"
                 />
               </div>

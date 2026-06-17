@@ -46,7 +46,7 @@ function normalizeCart(raw: RawCart | null | undefined): CartLine[] {
         name: p.name || "",
         image: resolveImageUrl(firstImage ?? undefined),
         priceCents: Math.round(Number(p.price ?? 0) * 100),
-        currency: p.currency || "USD",
+        currency: p.currency || "INR",
         quantity: Number(item.quantity || 1),
       };
     })
@@ -117,13 +117,8 @@ export function useClearServerCart() {
 // Lives here because it touches both the guest store and the server cart.
 // Auth's login mutation onSuccess hook calls this after the cookie is set.
 export async function mergeGuestCartIntoServer(): Promise<void> {
-  const guestLines = useCartStore.getState().lines;
-  if (guestLines.length === 0) return;
-
-  await api.post<EnvelopedResponse<unknown>>("/cart/merge", {
-    items: guestLines.map((l) => ({ productId: l.productId, quantity: l.quantity })),
-  });
-
-  // Server now owns the cart; wipe the guest store.
-  useCartStore.getState().clear();
+  // No-op: the cart is local-only (the showcase product has no backend Product
+  // document, so /cart/merge would reject it). The persisted guest store is the
+  // single source of truth across guest → signed-in, so there is nothing to
+  // merge and the local cart must survive login untouched.
 }

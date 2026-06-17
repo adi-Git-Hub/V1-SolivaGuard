@@ -11,7 +11,7 @@ export const productSchema = z.object({
   description: z.string(),
   priceCents: z.number().int().nonnegative(),
   compareAtCents: z.number().int().nonnegative().nullable(),
-  currency: z.string().default("USD"),
+  currency: z.string().default("INR"),
   images: z.array(z.string()),
   categoryId: z.string(),
   categorySlug: z.string(),

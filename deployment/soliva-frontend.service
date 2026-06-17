@@ -1,0 +1,16 @@
+[Unit]
+Description=Soliva Frontend Service
+After=network.target soliva-backend.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/Aditya/the-final-Soliva/Frontend
+ExecStart=/usr/local/bin/npm run dev
+Restart=always
+# Standard output/error logging
+StandardOutput=append:/root/Aditya/the-final-Soliva/logs/frontend.log
+StandardError=append:/root/Aditya/the-final-Soliva/logs/frontend.error.log
+
+[Install]
+WantedBy=multi-user.target

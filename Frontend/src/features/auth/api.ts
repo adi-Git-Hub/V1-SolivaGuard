@@ -1,7 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { authClient } from "@/lib/auth-client";
-import { signOutFirebase } from "@/lib/firebase";
 import { cartKeys, mergeGuestCartIntoServer } from "@/features/cart/api";
 import { sessionQueryKey } from "./hooks/useSession";
 import type {
@@ -36,7 +35,8 @@ export function useLogin() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: LoginInput) => authClient.login(input),
-    onSuccess: async () => {
+    onSuccess: async (session) => {
+      qc.setQueryData(sessionQueryKey, session);
       qc.invalidateQueries({ queryKey: sessionQueryKey });
       await mergeGuestCartSafely(qc);
     },
@@ -45,7 +45,7 @@ export function useLogin() {
 
 export function useRegister() {
   // Register itself does NOT create a session — backend sends an OTP email.
-  // The component navigates to /verify-email?email=... after success.
+  // The component handles OTP verification on the same page after success.
   return useMutation({
     mutationFn: (input: RegisterInput) => authClient.register(input),
   });
@@ -57,7 +57,8 @@ export function useGoogleAuth() {
     // Takes the Firebase ID token from the Google popup and trades it for a
     // Soliva session. Mirrors useLogin: refresh the session, merge guest cart.
     mutationFn: (idToken: string) => authClient.googleSignIn(idToken),
-    onSuccess: async () => {
+    onSuccess: async (session) => {
+      qc.setQueryData(sessionQueryKey, session);
       qc.invalidateQueries({ queryKey: sessionQueryKey });
       await mergeGuestCartSafely(qc);
     },
@@ -69,7 +70,8 @@ export function useVerifyEmail() {
   return useMutation({
     mutationFn: (input: VerifyEmailInput & { email: string }) =>
       authClient.verifyEmail({ email: input.email, otp: input.otp }),
-    onSuccess: async () => {
+    onSuccess: async (session) => {
+      qc.setQueryData(sessionQueryKey, session);
       qc.invalidateQueries({ queryKey: sessionQueryKey });
       await mergeGuestCartSafely(qc);
     },
@@ -89,6 +91,8 @@ export function useLogout() {
     // user is fully signed out (no lingering Firebase auth state).
     mutationFn: async () => {
       await authClient.logout();
+      // Isolate Firebase from initial bundle via dynamic import
+      const { signOutFirebase } = await import("@/lib/firebase");
       await signOutFirebase();
     },
     onSuccess: () => {
@@ -113,7 +117,8 @@ export function useResetPassword() {
         otp: input.otp,
         password: input.password,
       }),
-    onSuccess: async () => {
+    onSuccess: async (session) => {
+      qc.setQueryData(sessionQueryKey, session);
       qc.invalidateQueries({ queryKey: sessionQueryKey });
       await mergeGuestCartSafely(qc);
     },

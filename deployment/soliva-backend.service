@@ -1,0 +1,18 @@
+[Unit]
+Description=Soliva Backend Service
+After=network.target docker.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/Aditya/the-final-Soliva/Backend
+ExecStart=/usr/local/bin/node server.js
+Restart=always
+Environment=NODE_ENV=development
+# Load environment variables from .env if needed, but node server.js does it via dotenv
+# Standard output/error logging
+StandardOutput=append:/root/Aditya/the-final-Soliva/logs/backend.log
+StandardError=append:/root/Aditya/the-final-Soliva/logs/backend.error.log
+
+[Install]
+WantedBy=multi-user.target

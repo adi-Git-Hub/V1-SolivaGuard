@@ -18,7 +18,7 @@ const sizes = {
 export function PriceDisplay({
   priceCents,
   compareAtCents,
-  currency = "USD",
+  currency = "INR",
   className,
   size = "md",
 }: Props) {

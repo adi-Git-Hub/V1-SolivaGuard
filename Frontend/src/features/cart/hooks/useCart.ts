@@ -1,23 +1,17 @@
 import { useMemo } from "react";
 
 import { useSession } from "@/features/auth/hooks/useSession";
-import {
-  useAddToServerCart,
-  useClearServerCart,
-  useRemoveServerCartItem,
-  useServerCartQuery,
-  useUpdateServerCartItem,
-} from "../api";
 import { useCartStore } from "../store";
 import type { CartLine } from "../schema";
 
-// Unified cart facade. Components don't care whether the user is signed in:
-// they call `add` / `remove` / `setQuantity` / `clear` and read `lines`,
-// `itemCount`, `subtotalCents` the same way.
+// Unified cart facade. Components call `add` / `remove` / `setQuantity` /
+// `clear` and read `lines`, `itemCount`, `subtotalCents` the same way.
 //
-//   session === undefined → still loading; treat as guest until known.
-//   session === null      → guest. Use the local Zustand store.
-//   session === Session   → signed in. Use the server cart via React Query.
+// The storefront sells a single showcase product (SunWrap) that lives entirely
+// in the frontend — it has no backend Product document — so the server cart
+// (which does Product.findById) can never accept it. The cart therefore lives
+// in the persisted local store for BOTH guests and signed-in users, and
+// checkout is staged separately via the checkout store + Razorpay.
 export type CartFacade = {
   lines: CartLine[];
   itemCount: number;
@@ -34,21 +28,11 @@ export function useCart(): CartFacade {
   const session = useSession();
   const isSignedIn = Boolean(session);
 
-  // Guest store (always subscribed so logging out reverts instantly).
-  const guestLines = useCartStore((s) => s.lines);
-  const guestAdd = useCartStore((s) => s.add);
-  const guestRemove = useCartStore((s) => s.remove);
-  const guestSet = useCartStore((s) => s.setQuantity);
-  const guestClear = useCartStore((s) => s.clear);
-
-  // Server cart — only fetches when authenticated.
-  const serverQuery = useServerCartQuery(isSignedIn);
-  const addMut = useAddToServerCart();
-  const updateMut = useUpdateServerCartItem();
-  const removeMut = useRemoveServerCartItem();
-  const clearMut = useClearServerCart();
-
-  const lines: CartLine[] = isSignedIn ? (serverQuery.data ?? []) : guestLines;
+  const lines = useCartStore((s) => s.lines);
+  const add = useCartStore((s) => s.add);
+  const remove = useCartStore((s) => s.remove);
+  const setQuantity = useCartStore((s) => s.setQuantity);
+  const clear = useCartStore((s) => s.clear);
 
   const { itemCount, subtotalCents } = useMemo(() => {
     let count = 0;
@@ -60,45 +44,11 @@ export function useCart(): CartFacade {
     return { itemCount: count, subtotalCents: subtotal };
   }, [lines]);
 
-  function add(input: Omit<CartLine, "quantity"> & { quantity?: number }) {
-    const quantity = input.quantity ?? 1;
-    if (isSignedIn) {
-      addMut.mutate({ productId: input.productId, quantity });
-    } else {
-      guestAdd(input);
-    }
-  }
-
-  function remove(productId: string) {
-    if (isSignedIn) {
-      removeMut.mutate(productId);
-    } else {
-      guestRemove(productId);
-    }
-  }
-
-  function setQuantity(productId: string, quantity: number) {
-    if (isSignedIn) {
-      if (quantity <= 0) removeMut.mutate(productId);
-      else updateMut.mutate({ productId, quantity });
-    } else {
-      guestSet(productId, quantity);
-    }
-  }
-
-  function clear() {
-    if (isSignedIn) {
-      clearMut.mutate();
-    } else {
-      guestClear();
-    }
-  }
-
   return {
     lines,
     itemCount,
     subtotalCents,
-    isLoading: isSignedIn ? serverQuery.isLoading : false,
+    isLoading: false,
     isSignedIn,
     add,
     remove,

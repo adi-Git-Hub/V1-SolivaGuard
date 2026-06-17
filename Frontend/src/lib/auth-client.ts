@@ -19,9 +19,16 @@ export const userSchema = z.object({
   role: z.enum(["user", "admin"]),
   isVerified: z.boolean().optional(),
   username: z.string().optional(),
+  // Account phone number (E.164-ish string as stored on the backend user doc),
+  // or null when the user never provided one. Used to prefill checkout.
+  phoneNumber: z.string().nullable().optional(),
   // Public URL of the uploaded avatar, or null when the user hasn't uploaded
   // one. The frontend Avatar component shows an initials fallback in that case.
   avatarUrl: z.string().nullable().optional(),
+  // Account creation timestamp (ISO) — drives "Member Since" on the profile hub.
+  createdAt: z.string().nullable().optional(),
+  // Number of active login sessions on the backend user doc (security widget).
+  sessionsCount: z.number().optional(),
 });
 export type User = z.infer<typeof userSchema>;
 
@@ -43,7 +50,10 @@ function normalizeUser(raw: unknown): User {
     role: r.role,
     isVerified: r.isVerified,
     username: r.username,
+    phoneNumber: (r.phoneNumber as string | null | undefined) ?? null,
     avatarUrl: (r.avatarUrl as string | null | undefined) ?? null,
+    createdAt: (r.createdAt as string | null | undefined) ?? null,
+    sessionsCount: Array.isArray(r.loginSessions) ? r.loginSessions.length : undefined,
   });
 }
 

@@ -1,61 +1,91 @@
+// ── Shared branded email shell (logo banner + amber rule + warm palette) ──
+// Public site origin used in emails — must be a PUBLICLY reachable https URL
+// (NOT a localhost dev entry, or the logo/links break in mail clients).
+const SITE = (process.env.PUBLIC_SITE_URL ||
+  (process.env.FRONTEND_URL || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .find((u) => /^https:\/\//.test(u)) ||
+  'https://solivaguard.com').replace(/\/+$/, '');
+const LOGO_URL = `${SITE}/soliva_logo_high_resolution-removebg-preview.png`;
+
+const esc = (v) =>
+  String(v == null ? '' : v)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+
+const brandWrap = ({ heading, intro = '', bodyHtml = '', ctaText, ctaUrl, footnote }) => `
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#FAF7F3;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#FAF7F3;padding:28px 12px;">
+    <tr><td align="center">
+      <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:18px;overflow:hidden;box-shadow:0 18px 50px -28px rgba(58,42,34,0.4);">
+        <tr><td align="center" style="background:#f4ece1;padding:34px 24px 26px;">
+          <img src="${LOGO_URL}" alt="Soliva" height="40" style="height:40px;display:block;border:0;outline:none;" />
+          <div style="margin-top:12px;font-family:Georgia,'Times New Roman',serif;font-size:11px;letter-spacing:4px;text-transform:uppercase;color:#c76600;">Built for movement</div>
+        </td></tr>
+        <tr><td style="height:3px;background:#c76600;font-size:0;line-height:0;">&nbsp;</td></tr>
+        <tr><td style="padding:38px 40px 28px;font-family:Helvetica,Arial,sans-serif;">
+          <h1 style="margin:0 0 14px;font-size:24px;line-height:1.25;color:#3a2a22;font-weight:700;">${heading}</h1>
+          ${intro ? `<p style="margin:0 0 18px;font-size:15px;line-height:1.7;color:#7b6a5f;">${intro}</p>` : ''}
+          ${bodyHtml}
+          ${ctaText && ctaUrl ? `<div style="margin:30px 0 6px;"><a href="${ctaUrl}" style="display:inline-block;background:#c76600;color:#ffffff;text-decoration:none;font-size:13px;font-weight:bold;letter-spacing:1px;text-transform:uppercase;padding:14px 30px;border-radius:999px;">${ctaText}</a></div>` : ''}
+        </td></tr>
+        ${footnote ? `<tr><td style="padding:0 40px 30px;font-family:Helvetica,Arial,sans-serif;"><p style="margin:0;font-size:12px;line-height:1.6;color:#a89a8d;">${footnote}</p></td></tr>` : ''}
+        <tr><td style="background:#FAF7F3;padding:22px 40px;border-top:1px solid #efe7dd;font-family:Helvetica,Arial,sans-serif;">
+          <p style="margin:0;font-size:11px;color:#a89a8d;">© 2026 Soliva. All rights reserved.</p>
+          <p style="margin:6px 0 0;font-size:11px;color:#c2b5a8;">Soliva · India · <a href="${SITE}" style="color:#c76600;text-decoration:none;">solivaguard.com</a></p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+
 const getOTPTemplate = (otp, type) => {
   const titles = {
-    verification: 'Verify Your Email',
-    forgotPassword: 'Reset Your Password',
+    verification: 'Verify your email',
+    forgotPassword: 'Reset your password',
   };
-
   const messages = {
-    verification: 'Thank you for joining Soliva. Please use the following OTP to verify your email address. This OTP is valid for 10 minutes.',
-    forgotPassword: 'We received a request to reset your password. Please use the following OTP to proceed. This OTP is valid for 10 minutes.',
+    verification: 'Thank you for joining Soliva. Use the code below to verify your email address. It is valid for 10 minutes.',
+    forgotPassword: 'We received a request to reset your password. Use the code below to proceed. It is valid for 10 minutes.',
   };
 
-  return `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
-      <div style="text-align: center; margin-bottom: 30px;">
-        <h1 style="color: #4f46e5; margin: 0;">Soliva</h1>
-      </div>
-      <h2 style="color: #333;">${titles[type]}</h2>
-      <p style="color: #555; line-height: 1.5;">${messages[type]}</p>
-      <div style="text-align: center; margin: 30px 0;">
-        <div style="display: inline-block; padding: 15px 30px; background-color: #f3f4f6; border-radius: 8px; font-size: 24px; font-weight: bold; letter-spacing: 5px; color: #111827;">
-          ${otp}
-        </div>
-      </div>
-      <p style="color: #777; font-size: 12px; text-align: center;">
-        If you did not request this, please ignore this email or contact support if you have concerns.
-      </p>
-      <hr style="border: 0; border-top: 1px solid #eee; margin: 30px 0;">
-      <p style="color: #999; font-size: 11px; text-align: center;">
-        &copy; 2026 Soliva Guard. All rights reserved.
-      </p>
-    </div>
-  `;
+  return brandWrap({
+    heading: titles[type] || 'Your code',
+    intro: messages[type] || '',
+    bodyHtml: `
+      <div style="text-align:center;margin:26px 0 6px;">
+        <div style="display:inline-block;padding:16px 32px;background:#f4ece1;border:1px solid #ead9c6;border-radius:12px;font-size:28px;font-weight:bold;letter-spacing:8px;color:#3a2a22;">${esc(otp)}</div>
+      </div>`,
+    footnote: 'If you did not request this, you can safely ignore this email.',
+  });
 };
 
 const getWelcomeTemplate = (name) => {
-  return `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
-      <div style="text-align: center; margin-bottom: 30px;">
-        <h1 style="color: #4f46e5; margin: 0;">Soliva</h1>
-      </div>
-      <h2 style="color: #333;">Welcome to Soliva, ${name}!</h2>
-      <p style="color: #555; line-height: 1.5;">
-        We are thrilled to have you as part of our community. Your account is now verified and ready to use.
-      </p>
-      <div style="text-align: center; margin: 30px 0;">
-        <a href="${process.env.FRONTEND_URL}" style="display: inline-block; padding: 12px 24px; background-color: #4f46e5; color: #fff; text-decoration: none; border-radius: 6px; font-weight: bold;">
-          Start Shopping
-        </a>
-      </div>
-      <p style="color: #555; line-height: 1.5;">
-        If you have any questions, feel free to reply to this email or visit our help center.
-      </p>
-      <hr style="border: 0; border-top: 1px solid #eee; margin: 30px 0;">
-      <p style="color: #999; font-size: 11px; text-align: center;">
-        &copy; 2026 Soliva Guard. All rights reserved.
-      </p>
-    </div>
-  `;
+  const first = String(name || '').trim().split(/\s+/)[0] || 'there';
+  return brandWrap({
+    heading: `Welcome to Soliva, ${esc(first)}.`,
+    intro:
+      'Your account is ready. From the Soliva team — we are thrilled to have you with us. Thoughtful protection, designed for everyday movement, now begins.',
+    bodyHtml: `
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 4px;">
+        ${['Full face, neck & back coverage', 'Breathable comfort for long hours', 'Built for Indian heat, dust & UV']
+          .map(
+            (t) => `<tr><td style="padding:6px 0;font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#3a2a22;">
+              <span style="color:#c76600;font-weight:bold;">✓</span>&nbsp;&nbsp;${t}</td></tr>`,
+          )
+          .join('')}
+      </table>`,
+    ctaText: 'Explore the Collection',
+    ctaUrl: `${SITE}/collection`,
+    footnote: 'Have a question? Just reply to this email — a real person will read it.',
+  });
 };
 
 const getPasswordChangedTemplate = (name) => {
@@ -331,4 +361,66 @@ const getOrderConfirmationTemplate = ({ customerName, orderId, orderItems, total
   `;
 };
 
-module.exports = { getOTPTemplate, getWelcomeTemplate, getPasswordChangedTemplate, getOrderConfirmationTemplate };
+// ── Contact / Support (feedback) emails ──────────────────────────────────
+const detailRow = (label, value) =>
+  value
+    ? `<tr>
+        <td style="padding:8px 0;width:130px;vertical-align:top;font-family:Helvetica,Arial,sans-serif;font-size:12px;font-weight:bold;text-transform:uppercase;letter-spacing:1px;color:#a89a8d;">${esc(label)}</td>
+        <td style="padding:8px 0;font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#3a2a22;">${esc(value)}</td>
+      </tr>`
+    : '';
+
+// → Admin: a new enquiry from the /contact form.
+const getContactNotificationTemplate = ({ name, email, phone, subject, orderNumber, message }) =>
+  brandWrap({
+    heading: 'New contact message',
+    intro: 'A customer reached out through the Soliva contact form.',
+    bodyHtml: `
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid #efe7dd;">
+        ${detailRow('Name', name)}
+        ${detailRow('Email', email)}
+        ${detailRow('Phone', phone)}
+        ${detailRow('Subject', subject)}
+        ${detailRow('Order #', orderNumber)}
+      </table>
+      <div style="margin-top:18px;padding:18px 20px;background:#f4ece1;border-radius:12px;font-family:Helvetica,Arial,sans-serif;font-size:14px;line-height:1.7;color:#3a2a22;white-space:pre-wrap;">${esc(message)}</div>`,
+    footnote: 'Reply directly to this email to respond to the customer.',
+  });
+
+// → Admin: new feedback from the /support form (may carry attachments).
+const getFeedbackNotificationTemplate = ({ name, email, category, subject, message, fileCount = 0 }) =>
+  brandWrap({
+    heading: 'New support feedback',
+    intro: 'A customer submitted the Soliva support form.',
+    bodyHtml: `
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid #efe7dd;">
+        ${detailRow('Name', name)}
+        ${detailRow('Email', email)}
+        ${detailRow('Category', category)}
+        ${detailRow('Subject', subject)}
+        ${detailRow('Attachments', fileCount ? `${fileCount} file(s) attached` : 'None')}
+      </table>
+      <div style="margin-top:18px;padding:18px 20px;background:#f4ece1;border-radius:12px;font-family:Helvetica,Arial,sans-serif;font-size:14px;line-height:1.7;color:#3a2a22;white-space:pre-wrap;">${esc(message)}</div>`,
+    footnote: 'Reply directly to this email to respond to the customer.',
+  });
+
+// → User: confirmation their message/feedback arrived.
+const getInboundConfirmationTemplate = (name, kind = 'message') =>
+  brandWrap({
+    heading: `Your ${kind === 'feedback' ? 'feedback' : 'message'} reached us.`,
+    intro: `Thank you${name ? `, ${esc(String(name).trim().split(/\s+/)[0])}` : ''}. Your ${kind === 'feedback' ? 'feedback' : 'message'} has reached the Soliva team successfully — we typically respond within 24 hours.`,
+    bodyHtml: `<p style="margin:0;font-size:14px;line-height:1.7;color:#7b6a5f;font-family:Helvetica,Arial,sans-serif;">In the meantime, feel free to explore the collection or browse our help guides.</p>`,
+    ctaText: 'Back to Soliva',
+    ctaUrl: SITE,
+    footnote: 'This is an automated confirmation — but a real person will follow up.',
+  });
+
+module.exports = {
+  getOTPTemplate,
+  getWelcomeTemplate,
+  getPasswordChangedTemplate,
+  getOrderConfirmationTemplate,
+  getContactNotificationTemplate,
+  getFeedbackNotificationTemplate,
+  getInboundConfirmationTemplate,
+};

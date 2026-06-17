@@ -285,12 +285,13 @@ class AuthService {
   }
 
   async login(email, password, req, isAdmin = false) {
-    const user = await authRepository.findUserByEmail(email, true);
+    const normalizedEmail = String(email).toLowerCase();
+    const user = await authRepository.findUserByEmail(normalizedEmail, true);
     const ipHash = hashIP(req.ip);
 
     if (!user || (isAdmin && user.role !== 'admin')) {
       await authRepository.createAuditLog({
-        email,
+        email: normalizedEmail,
         action: 'login_failed',
         status: 'failure',
         ipHash,

@@ -19,6 +19,11 @@ async function postAvatar(file: File): Promise<{ avatarUrl: string }> {
 
   if (!res.ok) {
     const payload = await res.json().catch(() => ({}));
+    console.error("[AVATAR] Upload failed:", {
+      status: res.status,
+      statusText: res.statusText,
+      payload,
+    });
     throw new ApiError(res.status, payload.code ?? "UNKNOWN", payload.message ?? res.statusText);
   }
 

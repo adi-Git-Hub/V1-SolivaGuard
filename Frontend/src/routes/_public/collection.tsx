@@ -12,6 +12,11 @@ import {
   ShoppingBag,
   Truck,
   ShieldCheck,
+  Sun,
+  Wind,
+  ScanFace,
+  ThermometerSun,
+  RotateCcw,
 } from "lucide-react";
 import { z } from "zod";
 
@@ -149,7 +154,7 @@ const collections = [
 
 /* Editorial "Built for Movement" insight cards (copied from homepage insight). */
 
-const eyebrow = "font-mono text-[0.6875rem] tracking-[0.34em] uppercase text-[#c76600] font-bold";
+const eyebrow = "font-mono text-[0.625rem] tracking-[0.4em] uppercase text-[#c76600] font-bold";
 
 /* Directional slide for the main gallery image (smooth horizontal slider). */
 const slideVariants = {
@@ -238,7 +243,7 @@ function CollectionRoute() {
   };
 
   return (
-    <div className="relative w-full bg-[#FAF7F3] text-[#3a2a22]">
+    <div className="relative w-full bg-[#FAF7F3] text-[#3a2a22] pb-24 lg:pb-0">
       {/* ════════ SECTION 1 — PRODUCT HERO ════════ */}
       <section className="relative pt-24 md:pt-28 pb-14 md:pb-16 lg:min-h-screen lg:flex lg:items-center lg:pt-28 lg:pb-16">
         <div className="mx-auto w-full max-w-[1280px] px-5 sm:px-8">
@@ -252,6 +257,14 @@ function CollectionRoute() {
             >
               {/* Main image — floating/breathing; slide on colour/view change, swipe on touch */}
               <div className="relative aspect-[4/5] w-full">
+                {/* Soft spotlight / ambient glow behind the product (tinted to the edition) */}
+                <div
+                  aria-hidden
+                  className="pointer-events-none absolute -inset-5 sm:-inset-7 rounded-[3rem] blur-3xl opacity-70 transition-all duration-700"
+                  style={{
+                    background: `radial-gradient(58% 52% at 50% 42%, ${edition.swatch}55, transparent 72%)`,
+                  }}
+                />
                 <motion.div
                   animate={
                     reduce
@@ -377,11 +390,11 @@ function CollectionRoute() {
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.8, delay: 0.45, ease: ease.smooth }}
-                className="font-display tracking-tight leading-[1.07] lg:whitespace-nowrap"
-                style={{ fontSize: "clamp(1.5rem, 2.9vw, 1.95rem)" }}
+                className="font-display tracking-tight leading-[1.12] max-w-[16ch] text-balance"
+                style={{ fontSize: "clamp(1.95rem, 3.4vw, 2.6rem)" }}
               >
                 Thoughtful protection for{" "}
-                <span className="italic font-light text-[#c76600]/90">everyday movement.</span>
+                <span className="italic font-light text-[#c76600]">everyday movement.</span>
               </motion.h1>
 
               <motion.p
@@ -411,9 +424,9 @@ function CollectionRoute() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.5, delay: 0.8 + i * 0.1, ease: ease.smooth }}
                     whileHover={{ y: -2 }}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-[#3a2a22]/10 bg-white/60 px-3.5 py-2 font-mono text-[0.6875rem] tracking-[0.06em] uppercase text-[#3a2a22]/75 font-semibold transition-colors duration-300 hover:border-[#c76600]/30 hover:bg-white"
+                    className="inline-flex items-center gap-1.5 rounded-full border border-[#3a2a22]/12 bg-white/50 px-3 py-1.5 font-mono text-[0.625rem] tracking-[0.1em] uppercase text-[#3a2a22]/70 font-semibold transition-all duration-300 hover:border-[#c76600]/35 hover:bg-white hover:text-[#3a2a22] hover:shadow-[0_8px_18px_-12px_rgba(58,42,34,0.4)]"
                   >
-                    <span aria-hidden>{t.emoji}</span>
+                    <span aria-hidden className="text-[0.7rem] opacity-80">{t.emoji}</span>
                     {t.label}
                   </motion.span>
                 ))}
@@ -430,9 +443,18 @@ function CollectionRoute() {
                   <span className="font-mono text-[0.625rem] tracking-[0.28em] uppercase text-[#3a2a22]/55 font-bold">
                     Available in 5 Editions
                   </span>
-                  <span className="font-mono text-[0.6875rem] tracking-[0.12em] text-[#3a2a22]/80">
-                    {edition.name}
-                  </span>
+                  <AnimatePresence mode="wait">
+                    <motion.span
+                      key={edition.name}
+                      initial={{ opacity: 0, y: -5 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 5 }}
+                      transition={{ duration: 0.25, ease: ease.smooth }}
+                      className="font-mono text-[0.6875rem] tracking-[0.12em] text-[#3a2a22] font-semibold"
+                    >
+                      {edition.name}
+                    </motion.span>
+                  </AnimatePresence>
                 </div>
                 <div className="flex items-center gap-3.5">
                   {editions.map((e, i) => (
@@ -441,10 +463,10 @@ function CollectionRoute() {
                       onClick={() => selectEdition(i)}
                       aria-label={e.name}
                       title={e.name}
-                      className={`relative h-9 w-9 rounded-full shadow-[0_2px_6px_-1px_rgba(58,42,34,0.25)] transition-transform duration-300 ease-out hover:scale-110 ${
+                      className={`relative h-11 w-11 sm:h-9 sm:w-9 rounded-full shadow-[0_3px_8px_-2px_rgba(58,42,34,0.3)] transition-all duration-300 ease-out hover:scale-110 ${
                         i === editionIndex
-                          ? "scale-105 ring-2 ring-offset-2 ring-offset-[#FAF7F3] ring-[#3a2a22]"
-                          : "ring-0 ring-offset-2 ring-offset-[#FAF7F3] ring-transparent"
+                          ? "scale-105 ring-2 ring-offset-2 ring-offset-[#FAF7F3] ring-[#c76600] shadow-[0_8px_18px_-5px_rgba(199,102,0,0.55)]"
+                          : "ring-0 ring-offset-2 ring-offset-[#FAF7F3] ring-transparent hover:shadow-[0_8px_16px_-5px_rgba(58,42,34,0.4)]"
                       }`}
                       style={{ background: e.swatch }}
                     >
@@ -496,20 +518,22 @@ function CollectionRoute() {
                     <span className="text-[1.05rem] font-light text-[#7b6a5f]/65 line-through decoration-[#7b6a5f]/40">
                       MRP ₹999
                     </span>
-                    <span className="rounded-full border border-[#c76600]/25 bg-[#c76600]/[0.07] px-2.5 py-1 font-mono text-[0.625rem] font-bold uppercase tracking-[0.14em] text-[#c76600]">
-                      Save ₹200
-                    </span>
                   </div>
                 )}
-                <div className="mt-3.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[0.75rem] font-light text-[#7b6a5f]">
+                <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-[0.75rem] font-medium text-[#3a2a22]/70">
                   <span className="inline-flex items-center gap-1.5">
-                    <Truck size={14} strokeWidth={1.75} className="text-[#c76600]/70" />
-                    Free Shipping Across India
+                    <Truck size={14} strokeWidth={1.9} className="text-[#c76600]" />
+                    Free Shipping
                   </span>
                   <span aria-hidden className="h-3 w-px bg-[#3a2a22]/15" />
                   <span className="inline-flex items-center gap-1.5">
-                    <ShieldCheck size={14} strokeWidth={1.75} className="text-[#c76600]/70" />
+                    <ShieldCheck size={14} strokeWidth={1.9} className="text-[#c76600]" />
                     GST Included
+                  </span>
+                  <span aria-hidden className="h-3 w-px bg-[#3a2a22]/15" />
+                  <span className="inline-flex items-center gap-1.5">
+                    <RotateCcw size={14} strokeWidth={1.9} className="text-[#c76600]" />
+                    Easy Returns
                   </span>
                 </div>
               </motion.div>
@@ -530,7 +554,7 @@ function CollectionRoute() {
                   className={`group inline-flex flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-full px-4 py-4 font-mono text-[0.7rem] tracking-[0.16em] uppercase font-black shadow-editorial transition-[background,box-shadow,transform] duration-300 sm:px-8 sm:tracking-[0.22em] ${
                     edition.isUnavailable
                       ? "bg-[#3a2a22]/40 text-[#f7f3ee]/60 cursor-not-allowed"
-                      : "bg-[#3a2a22] text-[#f7f3ee] hover:bg-[#2e211b] hover:shadow-[0_22px_46px_-18px_rgba(58,42,34,0.6)]"
+                      : "bg-gradient-to-b from-[#43312a] to-[#2e211b] text-[#f7f3ee] hover:from-[#4a3730] hover:to-[#231a15] hover:shadow-[0_22px_46px_-18px_rgba(58,42,34,0.65)]"
                   }`}
                 >
                   {edition.isUnavailable ? "Out of Stock" : "Buy Now"}
@@ -566,6 +590,31 @@ function CollectionRoute() {
                   )}
                 </motion.button>
               </motion.div>
+
+              {/* ════════ SECTION 8 — TRUST BLOCK ════════ */}
+              <motion.div
+                initial={{ opacity: 0, y: 14 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={viewportOnce}
+                transition={{ duration: 0.7, ease: ease.smooth }}
+                className="mt-9 grid grid-cols-2 gap-x-6 gap-y-4 border-t border-[#3a2a22]/10 pt-7"
+              >
+                {[
+                  { icon: Sun, label: "Advanced UV Defense" },
+                  { icon: Wind, label: "Breathable Fabric" },
+                  { icon: ScanFace, label: "Full Face Coverage" },
+                  { icon: ThermometerSun, label: "Designed For Indian Conditions" },
+                ].map(({ icon: Icon, label }) => (
+                  <div key={label} className="flex items-center gap-2.5">
+                    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#c76600]/10 text-[#c76600]">
+                      <Icon size={15} strokeWidth={1.9} />
+                    </span>
+                    <span className="text-[0.8rem] font-medium leading-tight text-[#3a2a22]/80">
+                      {label}
+                    </span>
+                  </div>
+                ))}
+              </motion.div>
             </div>
           </div>
         </div>
@@ -583,6 +632,37 @@ function CollectionRoute() {
           />
         </div>
       </section>
+
+      {/* ════════ SECTION 11 — STICKY MOBILE CTA ════════ */}
+      <div className="lg:hidden fixed inset-x-0 bottom-0 z-40 flex items-center gap-3 border-t border-[#3a2a22]/10 bg-[#FAF7F3]/92 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-xl shadow-[0_-8px_24px_-12px_rgba(58,42,34,0.25)]">
+        <div className="flex flex-col leading-none">
+          {edition.isUnavailable ? (
+            <span className="font-display text-lg text-[#3a2a22]">Sold Out</span>
+          ) : (
+            <>
+              <span className="font-display text-xl text-[#3a2a22]">₹799</span>
+              <span className="text-[0.65rem] text-[#7b6a5f]/70 line-through">₹999</span>
+            </>
+          )}
+        </div>
+        <button
+          onClick={edition.isUnavailable ? undefined : buyNow}
+          disabled={edition.isUnavailable}
+          className={`flex flex-1 items-center justify-center gap-2 rounded-full py-3.5 font-mono text-[0.7rem] font-black uppercase tracking-[0.18em] transition-colors ${
+            edition.isUnavailable
+              ? "cursor-not-allowed bg-[#3a2a22]/40 text-white/60"
+              : "bg-[#3a2a22] text-[#f7f3ee] active:bg-[#2e211b]"
+          }`}
+        >
+          {edition.isUnavailable ? (
+            "Out of Stock"
+          ) : (
+            <>
+              Buy Now <ArrowRight size={14} />
+            </>
+          )}
+        </button>
+      </div>
     </div>
   );
 }

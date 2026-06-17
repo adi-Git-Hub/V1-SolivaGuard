@@ -41,6 +41,7 @@ export function MiniCartDrawer() {
     <Sheet open={isOpen} onOpenChange={(open) => !open && closeCart()}>
       <SheetContent
         side="right"
+        showCloseButton={false}
         className="w-full sm:max-w-md p-0 flex flex-col bg-background/95 backdrop-blur-2xl border-l border-white/10"
         aria-describedby={undefined}
       >

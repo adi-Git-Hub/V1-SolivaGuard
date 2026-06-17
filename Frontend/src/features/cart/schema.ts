@@ -6,7 +6,7 @@ export const cartLineSchema = z.object({
   name: z.string(),
   image: z.string().url(),
   priceCents: z.number().int().nonnegative(),
-  currency: z.string().default("USD"),
+  currency: z.string().default("INR"),
   quantity: z.number().int().min(1),
 });
 export type CartLine = z.infer<typeof cartLineSchema>;
