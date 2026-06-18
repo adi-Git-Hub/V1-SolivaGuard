@@ -116,7 +116,7 @@ function Half({ data, side }: { data: HalfData; side: "left" | "right" }) {
 
   const Features = (
     <ul
-      className={`order-1 flex flex-col justify-center px-4 py-3 lg:px-8 lg:py-4 ${
+      className={`order-2 flex flex-col justify-center px-4 py-3 lg:px-8 lg:py-4 ${
         isSoliva ? "md:order-1" : "md:order-2"
       }`}
     >
@@ -127,7 +127,7 @@ function Half({ data, side }: { data: HalfData; side: "left" | "right" }) {
           whileInView={{ opacity: 1, x: 0 }}
           viewport={{ once: true, amount: 0.6 }}
           transition={{ duration: 0.5, ease: EASE, delay: 0.1 + i * 0.05 }}
-          className="flex items-center gap-3 border-b py-2.5 last:border-b-0 sm:py-3 lg:py-3.5"
+          className="flex items-center gap-3 border-b py-2 last:border-b-0 sm:py-3 lg:py-3.5"
           style={{ borderColor: line }}
         >
           <span
@@ -149,7 +149,7 @@ function Half({ data, side }: { data: HalfData; side: "left" | "right" }) {
 
   const Image = (
     <div
-      className={`relative order-2 h-[220px] self-end overflow-hidden sm:h-[280px] lg:h-[340px] ${
+      className={`relative order-1 h-[300px] self-end overflow-hidden sm:h-[280px] lg:h-[340px] ${
         isSoliva ? "md:order-2" : "md:order-1"
       }`}
     >
