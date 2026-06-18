@@ -1,8 +1,19 @@
-import { motion, useScroll, useTransform } from "framer-motion";
-import { useRef } from "react";
+import { motion, AnimatePresence, useScroll, useTransform } from "framer-motion";
+import { useRef, useState, useEffect } from "react";
 import { Sun, Check } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { viewportOnce, ease } from "@/design-system";
+
+// Mobile hero auto-slider — the SAME product images that power the Collection
+// page (editions[] in CollectionSection). Mapping: 1→2→3→4→1 (slide 5 reuses
+// image 1), looping. Used ONLY inside the md:hidden mobile hero.
+const heroSlides = [
+  "/product_images/pink-1.webp", // 1 · Blush Pink
+  "/product_images/olive-1.webp", // 2 · Olive Green
+  "/product_images/blue-1.webp", // 3 · Deep Blue
+  "/product_images/beige-1.webp", // 4 · Classic Beige
+  "/product_images/pink-1.webp", // 5 · reuse image 1
+];
 
 const stripItems = [
   "Lightweight",
@@ -31,6 +42,14 @@ export function Hero({ isRevealed = false }: { isRevealed?: boolean }) {
   });
   const scrollOpacity = useTransform(scrollYProgress, [0.8, 1], [1, 0]);
 
+  // Mobile hero slider: advance every 3000ms, loop. (Runs harmlessly on desktop
+  // too — the slider is display:none ≥768px, so desktop stays visually identical.)
+  const [heroSlide, setHeroSlide] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setHeroSlide((s) => (s + 1) % heroSlides.length), 3000);
+    return () => clearInterval(id);
+  }, []);
+
   return (
     <section
       ref={sectionRef}
@@ -52,20 +71,27 @@ export function Hero({ isRevealed = false }: { isRevealed?: boolean }) {
             transition={{ duration: 0.5, ease: ease.luxe }}
             className="m-hero-mobile md:hidden flex w-full flex-col items-center gap-3 px-4"
           >
-            {/* 1 · Product image — floating, height-capped */}
+            {/* 1 · Product auto-slider — cycles the 5 colour variants (3s each,
+                 600ms left-swipe). Same card box; only the image area is the slider. */}
             <motion.div
               animate={{ y: [0, 8, 0] }}
               transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
-              className="w-full overflow-hidden rounded-3xl border border-[#3a2a22]/10 shadow-[0_22px_46px_-24px_rgba(58,42,34,0.5)]"
+              className="relative flex h-[34vh] max-h-[340px] min-h-[200px] w-full items-center justify-center overflow-hidden rounded-3xl border border-[#3a2a22]/10 bg-gradient-to-br from-[#FBF6F0] to-[#F1E7D8] shadow-[0_22px_46px_-24px_rgba(58,42,34,0.5)]"
             >
-              <img
-                src="/homepage-banner-mobile.webp"
-                alt="Soliva SunWrap — thoughtful sun and pollution protection"
-                loading="eager"
-                fetchPriority="high"
-                decoding="async"
-                className="h-[30vh] max-h-[300px] min-h-[160px] w-full object-cover object-center"
-              />
+              <AnimatePresence initial={false}>
+                <motion.img
+                  key={heroSlide}
+                  src={heroSlides[heroSlide]}
+                  alt="Soliva SunWrap product"
+                  loading="eager"
+                  decoding="async"
+                  initial={{ x: "100%" }}
+                  animate={{ x: 0 }}
+                  exit={{ x: "-100%" }}
+                  transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+                  className="absolute h-[88%] w-auto max-w-[88%] object-contain drop-shadow-[0_18px_24px_rgba(58,42,34,0.22)]"
+                />
+              </AnimatePresence>
             </motion.div>
 
             {/* 2 · Advanced UV Defense badge */}
