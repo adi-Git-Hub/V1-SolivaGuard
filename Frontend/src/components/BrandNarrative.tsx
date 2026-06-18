@@ -143,6 +143,19 @@ export function BrandNarrative() {
           </div>
         </motion.div>
 
+        {/* Interaction hint — mobile only (desktop reacts to mouse hover, so it
+            needs no prompt; phones react to touch and benefit from the nudge). */}
+        <motion.span
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          viewport={viewportOnce}
+          transition={{ duration: 1, delay: 0.3 }}
+          className="md:hidden -mt-1 mb-5 flex items-center gap-2 font-mono text-[0.5rem] tracking-[0.32em] uppercase text-white/35"
+        >
+          <span className="text-[#c76600]">✦</span>
+          Touch the logo to interact
+        </motion.span>
+
         {/* 3. SOCIAL/CONTACT ACTIONS */}
         <motion.div
           initial={{ opacity: 0, y: 16 }}
