@@ -1,11 +1,11 @@
 import { Link } from "@tanstack/react-router";
 import { SolivaLogo } from "@/components/SolivaLogo";
 
-const leftGroup = {
+const leftGroup: { title: string; links: { to: string; label: string; external?: boolean }[] } = {
   title: "Company",
   links: [
     { to: "/story", label: "About" },
-    { to: "https://wa.me/917350640608", label: "Contact", external: true },
+    { to: "/contact", label: "Contact" },
     { to: "/terms", label: "Terms & Conditions" },
   ],
 };
