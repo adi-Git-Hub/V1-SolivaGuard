@@ -452,3 +452,25 @@
     mix-blend-mode: normal !important;
   }
 }
+
+/* ════════════════════════════════════════════════════════════════════
+   MOBILE HOMEPAGE ORDER  (≤ 767px)
+   Master-structure flow on phones WITHOUT touching index.tsx or desktop:
+   product FIRST (hero → collection → video), THEN problem awareness
+   (everyday exposure), comparison, and the final CTA. `order` only takes
+   effect because this same block flips the homepage <main> to a flex
+   column on phones; desktop keeps its committed DOM order (this never
+   runs ≥768px). `:has(> .m-hero)` scopes it to the homepage <main> only.
+   ════════════════════════════════════════════════════════════════════ */
+@media (max-width: 767px) {
+  main:has(> .m-hero) {
+    display: flex;
+    flex-direction: column;
+  }
+  .m-hero        { order: 1; }  /* 1 · Product hero */
+  .m-collection  { order: 2; }  /* 2 · One Product. Five Colours. */
+  .m-video-screen{ order: 3; }  /* 3 · Protection in motion (video) */
+  .m-urban       { order: 5; }  /* 5 · Everyday exposure — moved BELOW product */
+  .m-compare     { order: 7; }  /* 7 · Soliva vs Ordinary */
+  .m-brand       { order: 9; }  /* 9 · Final CTA */
+}
