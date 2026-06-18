@@ -344,26 +344,47 @@ export function ParticleLogo({
     };
 
     // Touch equivalent of onMove — lets the logo react to a finger on phones /
-    // touchscreens (desktop mouse uses onMove above). We only wake the sim when
-    // the finger is over (or near) the logo, so normal page scrolling elsewhere
-    // never triggers it. passive: true → we never block the user's scroll.
-    const onTouch = (e: TouchEvent) => {
-      if (!inView) return;
-      const t = e.touches[0];
-      if (!t) return;
+    // touchscreens (desktop mouse uses onMove above). A gesture only "grabs" the
+    // logo if it STARTS over (or near) it; while grabbed we preventDefault so the
+    // page never scrolls — vertical drags shatter the particles instead of moving
+    // the section. Gestures that start elsewhere are ignored, so the rest of the
+    // page scrolls normally.
+    let touchActive = false;
+    const inLogoBounds = (t: Touch) => {
       const rect = canvas.getBoundingClientRect();
       const margin = 48;
-      if (
+      return !(
         t.clientX < rect.left - margin ||
         t.clientX > rect.right + margin ||
         t.clientY < rect.top - margin ||
         t.clientY > rect.bottom + margin
-      )
-        return;
+      );
+    };
+    const applyTouch = (t: Touch) => {
+      const rect = canvas.getBoundingClientRect();
       mouse.x = (t.clientX - rect.left) * dpr;
       mouse.y = (t.clientY - rect.top) * dpr;
       energy = 240;
       kick();
+    };
+    const onTouchStart = (e: TouchEvent) => {
+      const t = e.touches[0];
+      if (!inView || !t || !inLogoBounds(t)) {
+        touchActive = false;
+        return;
+      }
+      touchActive = true;
+      applyTouch(t);
+    };
+    const onTouchMove = (e: TouchEvent) => {
+      if (!inView || !touchActive) return;
+      const t = e.touches[0];
+      if (!t) return;
+      e.preventDefault(); // lock page scroll while interacting with the logo
+      applyTouch(t);
+    };
+    const onTouchEnd = () => {
+      touchActive = false;
     };
 
     const ro = new ResizeObserver(() => {
@@ -441,8 +462,10 @@ export function ParticleLogo({
       ro.observe(container); // backstop: fixes size the moment layout finalises
       io.observe(container);
       window.addEventListener("mousemove", onMove);
-      window.addEventListener("touchstart", onTouch, { passive: true });
-      window.addEventListener("touchmove", onTouch, { passive: true });
+      window.addEventListener("touchstart", onTouchStart, { passive: true });
+      window.addEventListener("touchmove", onTouchMove, { passive: false });
+      window.addEventListener("touchend", onTouchEnd);
+      window.addEventListener("touchcancel", onTouchEnd);
     };
 
     img.onload = ready;
@@ -462,8 +485,10 @@ export function ParticleLogo({
       img.onerror = null;
       cancelAnimationFrame(raf);
       window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("touchstart", onTouch);
-      window.removeEventListener("touchmove", onTouch);
+      window.removeEventListener("touchstart", onTouchStart);
+      window.removeEventListener("touchmove", onTouchMove);
+      window.removeEventListener("touchend", onTouchEnd);
+      window.removeEventListener("touchcancel", onTouchEnd);
       canvas.removeEventListener("webglcontextlost", onContextLost as EventListener);
       ro.disconnect();
       io.disconnect();
