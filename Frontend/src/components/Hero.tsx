@@ -1,22 +1,8 @@
-import { motion, AnimatePresence, useScroll, useTransform } from "framer-motion";
-import { useRef, useState, useEffect } from "react";
+import { motion, useScroll, useTransform } from "framer-motion";
+import { useRef } from "react";
 import { Sun, Check } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { viewportOnce, ease } from "@/design-system";
-
-// Mobile hero auto-slider — the SAME product images that power the Collection
-// page (editions[] in CollectionSection). Mapping: 1→2→3→4→1 (slide 5 reuses
-// image 1), looping. Used ONLY inside the md:hidden mobile hero.
-const heroSlides = [
-  "/product_images/pink-1.webp", // 1 · Blush Pink
-  "/product_images/olive-1.webp", // 2 · Olive Green
-  "/product_images/blue-1.webp", // 3 · Deep Blue
-  "/product_images/beige-1.webp", // 4 · Classic Beige
-  "/product_images/pink-1.webp", // 5 · Color 5 → reuse image 1
-];
-// Edition swatch colours (matches CollectionSection editions[]) — used for the
-// visual-only colour indicators beneath the mobile hero slider.
-const heroSwatches = ["#E4B7C6", "#6A7038", "#33508A", "#D8C3A0", "#AEC96B"];
 
 const stripItems = [
   "Lightweight",
@@ -45,14 +31,6 @@ export function Hero({ isRevealed = false }: { isRevealed?: boolean }) {
   });
   const scrollOpacity = useTransform(scrollYProgress, [0.8, 1], [1, 0]);
 
-  // Mobile hero slider: advance every 3000ms, loop. (Runs harmlessly on desktop
-  // too — the slider is display:none ≥768px, so desktop stays visually identical.)
-  const [heroSlide, setHeroSlide] = useState(0);
-  useEffect(() => {
-    const id = setInterval(() => setHeroSlide((s) => (s + 1) % heroSlides.length), 3500);
-    return () => clearInterval(id);
-  }, []);
-
   return (
     <section
       ref={sectionRef}
@@ -74,46 +52,22 @@ export function Hero({ isRevealed = false }: { isRevealed?: boolean }) {
             transition={{ duration: 0.5, ease: ease.luxe }}
             className="m-hero-mobile md:hidden flex w-full flex-col items-center gap-3 px-4"
           >
-            {/* 1 · Large premium product showcase slider — the model IS the hero.
-                 object-cover + object-top fills the frame and keeps the face/wrap;
-                 cycles 5 colour editions (3500ms, 700ms left-swipe). */}
-            <div className="w-full">
-              <div className="relative h-[320px] w-full overflow-hidden rounded-3xl border border-[#3a2a22]/8 bg-[#ece7e1] shadow-[0_18px_40px_-26px_rgba(58,42,34,0.42)]">
-                <AnimatePresence initial={false}>
-                  <motion.img
-                    key={heroSlide}
-                    src={heroSlides[heroSlide]}
-                    alt="Soliva SunWrap product"
-                    loading="eager"
-                    decoding="async"
-                    initial={{ x: "100%" }}
-                    animate={{ x: 0 }}
-                    exit={{ x: "-100%" }}
-                    transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-                    className="absolute inset-0 h-full w-full object-cover object-top"
-                  />
-                </AnimatePresence>
-                {/* soft bottom fade so the crop melts into the page */}
-                <div
-                  aria-hidden
-                  className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-[#FAF7F3]/70 to-transparent"
-                />
-              </div>
-
-              {/* Colour indicators — visual only, track the active edition */}
-              <div className="mt-3 flex items-center justify-center gap-2">
-                {heroSwatches.map((c, i) => (
-                  <span
-                    key={i}
-                    className="h-2 w-2 rounded-full ring-1 ring-black/5 transition-all duration-300"
-                    style={{
-                      backgroundColor: c,
-                      transform: i === heroSlide ? "scale(1.45)" : "scale(1)",
-                      opacity: i === heroSlide ? 1 : 0.35,
-                    }}
-                  />
-                ))}
-              </div>
+            {/* 1 · Single product image (no auto-slider — colours are browsed
+                 manually on /collection). object-cover + object-top keeps the face/wrap. */}
+            <div className="relative h-[320px] w-full overflow-hidden rounded-3xl border border-[#3a2a22]/8 bg-[#ece7e1] shadow-[0_18px_40px_-26px_rgba(58,42,34,0.42)]">
+              <img
+                src="/product_images/pink-1.webp"
+                alt="Soliva SunWrap product"
+                loading="eager"
+                fetchPriority="high"
+                decoding="async"
+                className="absolute inset-0 h-full w-full object-cover object-top"
+              />
+              {/* soft bottom fade so the crop melts into the page */}
+              <div
+                aria-hidden
+                className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-[#FAF7F3]/70 to-transparent"
+              />
             </div>
 
             {/* 2 · Advanced UV Defense badge */}
