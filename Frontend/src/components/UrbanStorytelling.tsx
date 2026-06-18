@@ -148,8 +148,8 @@ export function UrbanStorytelling() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 1.1, delay: 0.1, ease: ease.smooth }}
-                className="font-display text-[#3a2a22] leading-[1.1] tracking-tight text-center whitespace-nowrap"
-                style={{ fontSize: "clamp(1rem, 2.9vw, 2.4rem)" }}
+                className="font-display text-[#3a2a22] leading-[1.1] tracking-tight text-center whitespace-normal md:whitespace-nowrap"
+                style={{ fontSize: "clamp(1.3rem, 2.9vw, 2.4rem)" }}
               >
                 Everyday exposure doesn’t feel harmful.{" "}
                 <span className="italic font-bold text-[#8a5e3c]">Until it becomes everyday.</span>
@@ -161,8 +161,8 @@ export function UrbanStorytelling() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 1.0, delay: 0.2, ease: ease.smooth }}
-                className="mt-3 md:mt-4 text-[#3a2a22] font-light leading-relaxed text-center whitespace-nowrap"
-                style={{ fontSize: "clamp(0.7rem, 1.85vw, 1.05rem)" }}
+                className="mt-3 md:mt-4 text-[#3a2a22] font-light leading-relaxed text-center whitespace-normal md:whitespace-nowrap"
+                style={{ fontSize: "clamp(0.85rem, 1.85vw, 1.05rem)" }}
               >
                 Daily commuting quietly exposes people to environmental stress —{" "}
                 <span className="italic font-bold text-[#8a5e3c]">
