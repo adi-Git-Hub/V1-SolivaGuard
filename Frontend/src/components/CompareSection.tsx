@@ -1,6 +1,7 @@
 import { useRef } from "react";
 import { Link } from "@tanstack/react-router";
 import { motion, useScroll, useTransform, useReducedMotion } from "framer-motion";
+import { useIsMobile } from "@/design-system";
 
 /* ════════════════════════════════════════════════════════════════════════
  * SOLIVA — Comparison Section
@@ -102,8 +103,14 @@ function Cross({ color }: { color: string }) {
 function Half({ data, side }: { data: HalfData; side: "left" | "right" }) {
   const ref = useRef<HTMLDivElement>(null);
   const reduce = useReducedMotion();
+  const isMobile = useIsMobile();
   const { scrollYProgress } = useScroll({ target: ref, offset: ["start end", "end start"] });
   const imgY = useTransform(scrollYProgress, [0, 1], ["-4%", "4%"]);
+
+  // Mobile-only: soften the top fade so the model's head/helmet stays visible.
+  // Desktop keeps the original 13% mask + 20% wash exactly.
+  const maskTop = isMobile ? "5%" : "13%";
+  const washTop = isMobile ? "6%" : "20%";
 
   const isSoliva = side === "right";
   const bg = isSoliva ? "#F6EFE4" : "#E9E9EC";
@@ -159,8 +166,8 @@ function Half({ data, side }: { data: HalfData; side: "left" | "right" }) {
         loading="lazy"
         style={{
           y: reduce ? 0 : imgY,
-          WebkitMaskImage: "linear-gradient(to bottom, transparent 0%, black 13%)",
-          maskImage: "linear-gradient(to bottom, transparent 0%, black 13%)",
+          WebkitMaskImage: `linear-gradient(to bottom, transparent 0%, black ${maskTop})`,
+          maskImage: `linear-gradient(to bottom, transparent 0%, black ${maskTop})`,
         }}
         className="absolute inset-x-0 bottom-0 h-[110%] w-full scale-[1.02] object-cover object-top"
       />
@@ -168,7 +175,7 @@ function Half({ data, side }: { data: HalfData; side: "left" | "right" }) {
       <div
         className="pointer-events-none absolute inset-0"
         style={{
-          background: `linear-gradient(to bottom, ${bg} 0%, transparent 20%, transparent 92%, ${bg} 100%)`,
+          background: `linear-gradient(to bottom, ${bg} 0%, transparent ${washTop}, transparent 92%, ${bg} 100%)`,
         }}
       />
     </div>
