@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { viewportOnce, ease } from "@/design-system";
+import { FutureCollections } from "@/components/FutureCollections";
 import { useCart } from "@/features/cart/hooks/useCart";
 import { useCheckoutStore } from "@/features/checkout/store";
 import {
@@ -619,6 +620,9 @@ function CollectionRoute() {
           </div>
         </div>
       </section>
+
+      {/* ════════ FUTURE COLLECTIONS — premium product roadmap ════════ */}
+      <FutureCollections />
 
       {/* ════════ FREEDOM — full image (object-contain, nothing cropped) ════════ */}
       <section className="relative w-full overflow-hidden bg-[#3a2a22] py-12 md:py-16">
