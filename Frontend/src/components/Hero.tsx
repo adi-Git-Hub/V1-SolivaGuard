@@ -1,14 +1,8 @@
 import { motion, useScroll, useTransform } from "framer-motion";
 import { useRef } from "react";
-import { Sun, Wind, Bike } from "lucide-react";
+import { Sun, Check } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 import { viewportOnce, ease } from "@/design-system";
-
-// Mobile-only trust chips shown near the banner (md:hidden on desktop).
-const heroChips = [
-  { icon: Sun, label: "UV Protection" },
-  { icon: Wind, label: "Breathable Comfort" },
-  { icon: Bike, label: "Daily Commute Ready" },
-];
 
 const stripItems = [
   "Lightweight",
@@ -48,73 +42,69 @@ export function Hero({ isRevealed = false }: { isRevealed?: boolean }) {
       >
         {/* ── Full-bleed cinematic banner (sits right below the navbar) ── */}
         <div className="m-hero-banner relative min-h-0 w-full md:flex-1 overflow-hidden">
-          {/* ════ MOBILE HERO (mobile only): video → information → chips → CTA ════ */}
-
-          {/* 1 · Hero video — the dominant element */}
-          <motion.video
-            key="hero-video"
-            initial={{ opacity: 0, scale: 0.98 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.7, ease: ease.luxe }}
-            className="m-hero-video md:hidden block w-full"
-            autoPlay
-            loop
-            muted
-            playsInline
-            preload="auto"
-            poster="/homepage-banner-mobile.webp"
-          >
-            <source src="/soliva-hero.mp4" type="video/mp4" />
-          </motion.video>
-
-          {/* 2 · Information — micro-headline below the video */}
+          {/* ════ MOBILE HERO (mobile only) — product-first, single viewport ════
+               Order: product image → UV badge → headline → description →
+               Explore Collection → trust badges. One md:hidden wrapper, so it
+               is display:none ≥768px and CANNOT affect desktop. */}
           <motion.div
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.12, ease: ease.luxe }}
-            className="md:hidden flex items-center justify-center gap-2.5 px-5"
+            transition={{ duration: 0.5, ease: ease.luxe }}
+            className="m-hero-mobile md:hidden flex w-full flex-col items-center gap-3 px-4"
           >
-            <span className="h-px w-6 bg-[#3a2a22]/20" />
-            <span className="whitespace-nowrap font-mono text-[0.6rem] font-bold uppercase tracking-[0.26em] text-[#c76600]">
-              Premium Everyday Protection
-            </span>
-            <span className="h-px w-6 bg-[#3a2a22]/20" />
-          </motion.div>
+            {/* 1 · Product image — floating, height-capped */}
+            <motion.div
+              animate={{ y: [0, 8, 0] }}
+              transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
+              className="w-full overflow-hidden rounded-3xl border border-[#3a2a22]/10 shadow-[0_22px_46px_-24px_rgba(58,42,34,0.5)]"
+            >
+              <img
+                src="/homepage-banner-mobile.webp"
+                alt="Soliva SunWrap — thoughtful sun and pollution protection"
+                loading="eager"
+                fetchPriority="high"
+                decoding="async"
+                className="h-[30vh] max-h-[300px] min-h-[160px] w-full object-cover object-center"
+              />
+            </motion.div>
 
-          {/* 3 · Trust chips */}
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.22, ease: ease.luxe }}
-            className="md:hidden flex flex-wrap items-center justify-center gap-2 px-5"
-          >
-            {heroChips.map(({ icon: Icon, label }) => (
-              <span
-                key={label}
-                className="inline-flex items-center gap-1.5 rounded-full border border-[#3a2a22]/10 bg-white/70 px-3 py-1.5 font-mono text-[0.6rem] font-semibold uppercase tracking-[0.06em] text-[#3a2a22]/75"
-              >
-                <Icon className="h-3 w-3 text-[#c76600]" />
-                {label}
-              </span>
-            ))}
-          </motion.div>
-
-          {/* 4 · WhatsApp CTA */}
-          <motion.a
-            href="https://chat.whatsapp.com/"
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label="Join Soliva Community"
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.32, ease: ease.luxe }}
-            className="md:hidden inline-flex items-center gap-2.5 rounded-full bg-[#25D366] px-5 py-2.5 text-white shadow-[0_8px_20px_-8px_rgba(37,211,102,0.75)] active:scale-[0.97]"
-          >
-            <WhatsAppIcon className="h-4 w-4" />
-            <span className="font-mono text-[0.7rem] font-bold tracking-[0.01em]">
-              Join Soliva Community
+            {/* 2 · Advanced UV Defense badge */}
+            <span className="inline-flex items-center gap-2 rounded-full border border-[#c76600]/25 bg-[#c76600]/[0.08] px-3 py-1.5 font-mono text-[0.62rem] font-bold uppercase tracking-[0.18em] text-[#c76600]">
+              <Sun className="h-3 w-3" />
+              Advanced UV Defense
             </span>
-          </motion.a>
+
+            {/* 3 · Headline */}
+            <h1 className="text-center font-display text-[clamp(1.75rem,7vw,2.25rem)] leading-[1.08] tracking-tight text-[#3a2a22]">
+              Built For Everyday Movement
+            </h1>
+
+            {/* 4 · Short description */}
+            <p className="max-w-[20rem] text-center text-[0.92rem] font-light leading-relaxed text-[#3a2a22]/70">
+              Thoughtful protection for everyday life.
+            </p>
+
+            {/* 5 · Primary CTA — Explore Collection */}
+            <Link
+              to="/collection"
+              className="flex h-[52px] w-full items-center justify-center rounded-2xl bg-[#3a2a22] font-mono text-[0.72rem] font-bold uppercase tracking-[0.14em] text-white shadow-[0_14px_30px_-12px_rgba(58,42,34,0.65)] transition-transform active:scale-[0.98]"
+            >
+              Explore Collection
+            </Link>
+
+            {/* 6 · Trust badges */}
+            <div className="flex w-full flex-wrap items-center justify-center gap-x-4 gap-y-2">
+              {["UV Defense", "Breathable", "Lightweight", "Daily Comfort"].map((t) => (
+                <span
+                  key={t}
+                  className="inline-flex items-center gap-1 font-mono text-[0.6rem] font-semibold uppercase tracking-[0.08em] text-[#3a2a22]/60"
+                >
+                  <Check className="h-2.5 w-2.5 text-[#c76600]" />
+                  {t}
+                </span>
+              ))}
+            </div>
+          </motion.div>
 
           {/* ════ DESKTOP HERO (desktop only): the landscape banner ════ */}
           <img
