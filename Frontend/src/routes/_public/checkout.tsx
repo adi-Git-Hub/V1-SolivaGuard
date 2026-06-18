@@ -369,6 +369,28 @@ function CheckoutRoute() {
       toast.error("Geolocation is not supported by your browser");
       return;
     }
+    // Geolocation only works in a secure context (https / localhost). If the
+    // page was opened over plain http the browser blocks it before prompting.
+    if (typeof window !== "undefined" && window.isSecureContext === false) {
+      toast.error("Location needs a secure (https) connection — please enter the address manually.");
+      return;
+    }
+    // If the user has previously blocked location for this site, the prompt
+    // never re-appears and getCurrentPosition fails instantly. Detect that up
+    // front and guide them to re-enable it instead of just saying "denied".
+    try {
+      const perm = await navigator.permissions?.query({
+        name: "geolocation" as PermissionName,
+      });
+      if (perm && perm.state === "denied") {
+        toast.error(
+          "Location is blocked for this site. Tap the lock icon in the address bar → Permissions → allow Location, then try again (or enter it manually).",
+        );
+        return;
+      }
+    } catch {
+      // Permissions API unavailable — fall through and let the prompt decide.
+    }
     setLocating(true);
     navigator.geolocation.getCurrentPosition(
       async (position) => {
@@ -400,12 +422,19 @@ function CheckoutRoute() {
       (err) => {
         setLocating(false);
         if (err.code === err.PERMISSION_DENIED) {
-          toast.error("Location access denied. Please enter address manually.");
+          toast.error(
+            "Location access was denied. Enable it via the lock icon in your address bar, or enter the address manually.",
+          );
+        } else if (err.code === err.TIMEOUT) {
+          toast.error("Location request timed out. Please try again or enter the address manually.");
         } else {
           toast.error("Could not detect location. Please enter manually.");
         }
       },
-      { enableHighAccuracy: true, timeout: 10000 },
+      // High accuracy isn't needed to autofill an address; the relaxed options
+      // are far more reliable (allow a cached fix, longer timeout) so the call
+      // succeeds instead of failing on phones without an immediate GPS lock.
+      { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 },
     );
   }
 
