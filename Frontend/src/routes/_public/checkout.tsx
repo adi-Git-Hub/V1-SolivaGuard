@@ -622,7 +622,10 @@ function CheckoutRoute() {
       if (activePayment === "upi" && upiId) prefill.vpa = upiId;
 
       const options = {
-        key: RZP_KEY,
+        // Prefer the key the backend created the order with — guarantees the
+        // checkout key always matches the order (no "Error in opening checkout"
+        // from key/order mismatch). Falls back to the build-time env.
+        key: res.razorpayKeyId || RZP_KEY,
         amount,
         currency: "INR",
         name: "Soliva",

@@ -39,6 +39,7 @@ class OrderService {
              order: existingOrder,
              razorpayOrderId: existingOrder.paymentInfo.razorpay_order_id,
              amount: Math.round(existingOrder.totalPrice * 100),
+             razorpayKeyId: process.env.RAZORPAY_KEY_ID,
           };
         }
       }
@@ -128,6 +129,10 @@ class OrderService {
         order: createdOrder,
         razorpayOrderId: razorpayOrder.id,
         amount: razorpayOrder.amount,
+        // Return the SAME key the order was created with so the frontend
+        // checkout always matches the order — prevents key/order mismatch
+        // ("Error in opening checkout") if VITE_RAZORPAY_KEY_ID drifts.
+        razorpayKeyId: process.env.RAZORPAY_KEY_ID,
       };
     } catch (error) {
       if (session) { await session.abortTransaction(); session.endSession(); }

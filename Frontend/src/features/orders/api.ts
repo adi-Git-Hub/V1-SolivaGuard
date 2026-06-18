@@ -14,6 +14,7 @@ type CreateOrderResponse = {
   order: Order;
   razorpayOrderId: string;
   amount: number; // paise / cents — Razorpay's unit
+  razorpayKeyId?: string; // the key the order was created with (authoritative)
 };
 
 export const orderKeys = {
