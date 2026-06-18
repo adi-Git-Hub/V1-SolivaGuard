@@ -12,8 +12,11 @@ const heroSlides = [
   "/product_images/olive-1.webp", // 2 · Olive Green
   "/product_images/blue-1.webp", // 3 · Deep Blue
   "/product_images/beige-1.webp", // 4 · Classic Beige
-  "/product_images/pink-1.webp", // 5 · reuse image 1
+  "/product_images/pink-1.webp", // 5 · Color 5 → reuse image 1
 ];
+// Edition swatch colours (matches CollectionSection editions[]) — used for the
+// visual-only colour indicators beneath the mobile hero slider.
+const heroSwatches = ["#E4B7C6", "#6A7038", "#33508A", "#D8C3A0", "#AEC96B"];
 
 const stripItems = [
   "Lightweight",
@@ -46,7 +49,7 @@ export function Hero({ isRevealed = false }: { isRevealed?: boolean }) {
   // too — the slider is display:none ≥768px, so desktop stays visually identical.)
   const [heroSlide, setHeroSlide] = useState(0);
   useEffect(() => {
-    const id = setInterval(() => setHeroSlide((s) => (s + 1) % heroSlides.length), 3000);
+    const id = setInterval(() => setHeroSlide((s) => (s + 1) % heroSlides.length), 3500);
     return () => clearInterval(id);
   }, []);
 
@@ -71,28 +74,47 @@ export function Hero({ isRevealed = false }: { isRevealed?: boolean }) {
             transition={{ duration: 0.5, ease: ease.luxe }}
             className="m-hero-mobile md:hidden flex w-full flex-col items-center gap-3 px-4"
           >
-            {/* 1 · Product auto-slider — cycles the 5 colour variants (3s each,
-                 600ms left-swipe). Same card box; only the image area is the slider. */}
-            <motion.div
-              animate={{ y: [0, 8, 0] }}
-              transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
-              className="relative flex h-[34vh] max-h-[340px] min-h-[200px] w-full items-center justify-center overflow-hidden rounded-3xl border border-[#3a2a22]/10 bg-gradient-to-br from-[#FBF6F0] to-[#F1E7D8] shadow-[0_22px_46px_-24px_rgba(58,42,34,0.5)]"
-            >
-              <AnimatePresence initial={false}>
-                <motion.img
-                  key={heroSlide}
-                  src={heroSlides[heroSlide]}
-                  alt="Soliva SunWrap product"
-                  loading="eager"
-                  decoding="async"
-                  initial={{ x: "100%" }}
-                  animate={{ x: 0 }}
-                  exit={{ x: "-100%" }}
-                  transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-                  className="absolute h-[88%] w-auto max-w-[88%] object-contain drop-shadow-[0_18px_24px_rgba(58,42,34,0.22)]"
+            {/* 1 · Large premium product showcase slider — the model IS the hero.
+                 object-cover + object-top fills the frame and keeps the face/wrap;
+                 cycles 5 colour editions (3500ms, 700ms left-swipe). */}
+            <div className="w-full">
+              <div className="relative h-[320px] w-full overflow-hidden rounded-3xl border border-[#3a2a22]/8 bg-[#ece7e1] shadow-[0_18px_40px_-26px_rgba(58,42,34,0.42)]">
+                <AnimatePresence initial={false}>
+                  <motion.img
+                    key={heroSlide}
+                    src={heroSlides[heroSlide]}
+                    alt="Soliva SunWrap product"
+                    loading="eager"
+                    decoding="async"
+                    initial={{ x: "100%" }}
+                    animate={{ x: 0 }}
+                    exit={{ x: "-100%" }}
+                    transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+                    className="absolute inset-0 h-full w-full object-cover object-top"
+                  />
+                </AnimatePresence>
+                {/* soft bottom fade so the crop melts into the page */}
+                <div
+                  aria-hidden
+                  className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-[#FAF7F3]/70 to-transparent"
                 />
-              </AnimatePresence>
-            </motion.div>
+              </div>
+
+              {/* Colour indicators — visual only, track the active edition */}
+              <div className="mt-3 flex items-center justify-center gap-2">
+                {heroSwatches.map((c, i) => (
+                  <span
+                    key={i}
+                    className="h-2 w-2 rounded-full ring-1 ring-black/5 transition-all duration-300"
+                    style={{
+                      backgroundColor: c,
+                      transform: i === heroSlide ? "scale(1.45)" : "scale(1)",
+                      opacity: i === heroSlide ? 1 : 0.35,
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
 
             {/* 2 · Advanced UV Defense badge */}
             <span className="inline-flex items-center gap-2 rounded-full border border-[#c76600]/25 bg-[#c76600]/[0.08] px-3 py-1.5 font-mono text-[0.62rem] font-bold uppercase tracking-[0.18em] text-[#c76600]">
