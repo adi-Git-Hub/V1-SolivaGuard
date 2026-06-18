@@ -246,15 +246,31 @@ function CollectionRoute() {
   return (
     <div className="relative w-full bg-[#FAF7F3] text-[#3a2a22] pb-24 lg:pb-0">
       {/* ════════ SECTION 1 — PRODUCT HERO ════════ */}
-      <section className="relative pt-24 md:pt-28 pb-14 md:pb-16 lg:min-h-screen lg:flex lg:items-center lg:pt-28 lg:pb-16">
+      <section className="relative pt-20 md:pt-28 pb-14 md:pb-16 lg:min-h-screen lg:flex lg:items-center lg:pt-28 lg:pb-16">
         <div className="mx-auto w-full max-w-[1280px] px-5 sm:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-[0.9fr_1fr] gap-10 lg:gap-16 items-center">
+          {/* ── MOBILE headline (mobile only) — small, sits above the product image.
+               Hidden ≥768px; the desktop eyebrow+headline live in the RIGHT column. ── */}
+          <div className="md:hidden mb-5">
+            <div className="mb-3 flex items-center gap-3">
+              <span className="h-px w-8 bg-[#c76600]/40" />
+              <span className={eyebrow}>Women's Collection</span>
+            </div>
+            <h1
+              className="font-display tracking-tight leading-[1.15] text-balance"
+              style={{ fontSize: "clamp(1.4rem, 6vw, 1.75rem)" }}
+            >
+              Thoughtful protection for{" "}
+              <span className="italic font-light text-[#c76600]">everyday movement.</span>
+            </h1>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-[0.9fr_1fr] gap-6 md:gap-10 lg:gap-16 items-center">
             {/* LEFT — premium product gallery (5 editions × 4 views) */}
             <motion.div
               initial={{ opacity: 0, y: 18 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 1.2, ease: ease.smooth }}
-              className="order-1 lg:order-none flex flex-col gap-4 w-full lg:max-w-[420px] lg:mx-auto"
+              className="order-1 lg:order-none flex flex-col gap-2.5 md:gap-4 w-full max-w-[240px] mx-auto md:max-w-none lg:max-w-[420px] lg:mx-auto"
             >
               {/* Main image — floating/breathing; slide on colour/view change, swipe on touch */}
               <div className="relative aspect-[4/5] w-full">
@@ -375,13 +391,15 @@ function CollectionRoute() {
               </div>
             </motion.div>
 
-            {/* RIGHT — editorial copy + lifestyle tags */}
-            <div className="flex flex-col">
+            {/* RIGHT — editorial copy + lifestyle tags.
+                 order-2 on mobile keeps this column BELOW the gallery (order-1);
+                 md:order-none restores the original grid placement ≥768px. */}
+            <div className="order-2 md:order-none flex flex-col">
               <motion.div
                 initial={{ opacity: 0, y: 14 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.7, delay: 0.35, ease: ease.smooth }}
-                className="flex items-center gap-3 mb-6"
+                className="hidden md:flex items-center gap-3 mb-6"
               >
                 <span className="h-px w-8 bg-[#c76600]/40" />
                 <span className={eyebrow}>Women's Collection</span>
@@ -391,7 +409,7 @@ function CollectionRoute() {
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.8, delay: 0.45, ease: ease.smooth }}
-                className="font-display tracking-tight leading-[1.12] max-w-[16ch] text-balance"
+                className="hidden md:block font-display tracking-tight leading-[1.12] max-w-[16ch] text-balance"
                 style={{ fontSize: "clamp(1.95rem, 3.4vw, 2.6rem)" }}
               >
                 Thoughtful protection for{" "}
@@ -402,7 +420,7 @@ function CollectionRoute() {
                 initial={{ opacity: 0, y: 14 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.7, delay: 0.55, ease: ease.smooth }}
-                className="mt-6 font-display text-xl md:text-2xl text-[#3a2a22]"
+                className="order-3 md:order-none mt-7 md:mt-6 font-display text-xl md:text-2xl text-[#3a2a22]"
               >
                 SunWrap by Soliva
               </motion.p>
@@ -411,13 +429,13 @@ function CollectionRoute() {
                 initial={{ opacity: 0, y: 14 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.7, delay: 0.65, ease: ease.smooth }}
-                className="mt-3 max-w-[440px] text-[0.95rem] md:text-[1rem] text-[#7b6a5f] font-light leading-relaxed"
+                className="order-4 md:order-none mt-3 max-w-[440px] text-[0.95rem] md:text-[1rem] text-[#7b6a5f] font-light leading-relaxed"
               >
                 Full face, neck &amp; back coverage designed for everyday movement.
               </motion.p>
 
               {/* Lifestyle tags */}
-              <div className="mt-8 flex flex-wrap gap-2.5">
+              <div className="order-5 md:order-none mt-6 md:mt-8 flex flex-wrap gap-2.5">
                 {lifestyleTags.map((t, i) => (
                   <motion.span
                     key={t.label}
@@ -438,7 +456,7 @@ function CollectionRoute() {
                 initial={{ opacity: 0, y: 14 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.7, delay: 1.25, ease: ease.smooth }}
-                className="mt-8"
+                className="order-1 md:order-none mt-5 md:mt-8"
               >
                 <div className="flex items-center justify-between mb-3">
                   <span className="font-mono text-[0.625rem] tracking-[0.28em] uppercase text-[#3a2a22]/55 font-bold">
@@ -494,7 +512,7 @@ function CollectionRoute() {
                 initial={{ opacity: 0, y: 14 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.7, delay: 1.32, ease: ease.smooth }}
-                className="mt-8"
+                className="order-2 md:order-none mt-5 md:mt-8"
               >
                 <span className="font-mono text-[0.625rem] tracking-[0.28em] uppercase text-[#3a2a22]/55 font-bold">
                   {edition.isUnavailable ? "Status" : "Launch Price"}
@@ -543,7 +561,7 @@ function CollectionRoute() {
                 initial={{ opacity: 0, y: 14 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.7, delay: 1.4, ease: ease.smooth }}
-                className="mt-8 flex w-full max-w-[460px] items-stretch gap-3"
+                className="order-6 md:order-none mt-8 flex w-full max-w-[460px] items-stretch gap-3"
               >
                 {/* Buy Now — primary → /checkout (details) → Razorpay */}
                 <motion.button
@@ -598,7 +616,7 @@ function CollectionRoute() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={viewportOnce}
                 transition={{ duration: 0.7, ease: ease.smooth }}
-                className="mt-9 grid grid-cols-2 gap-x-6 gap-y-4 border-t border-[#3a2a22]/10 pt-7"
+                className="order-7 md:order-none mt-9 grid grid-cols-2 gap-x-6 gap-y-4 border-t border-[#3a2a22]/10 pt-7"
               >
                 {[
                   { icon: Sun, label: "Advanced UV Defense" },
