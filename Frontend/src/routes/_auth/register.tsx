@@ -240,12 +240,6 @@ function RegisterRoute() {
               </div>
             ))}
           </div>
-          <div className="flex items-center gap-2 pt-1">
-            <span className="h-px w-7 bg-[#FAF7F3]/30" />
-            <span className="text-[10px] uppercase tracking-[0.32em] text-[#FAF7F3]/60 font-bold">
-              Editorial No. 01 — The Collective
-            </span>
-          </div>
         </div>
       </aside>
 

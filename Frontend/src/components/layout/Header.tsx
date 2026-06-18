@@ -151,9 +151,6 @@ export function Header() {
                   aria-label="Search"
                 >
                   <Search className="h-[18px] w-[18px]" />
-                  <span className="ml-2 hidden lg:inline text-[10px] font-bold tracking-tighter opacity-40 group-hover:opacity-70">
-                    ⌘K
-                  </span>
                 </button>
               </div>
 
