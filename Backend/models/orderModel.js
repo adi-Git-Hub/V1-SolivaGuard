@@ -2,13 +2,25 @@ const mongoose = require('mongoose');
 
 const orderSchema = new mongoose.Schema(
   {
+    // Immutable shipping snapshot — copied at order time so editing a saved
+    // address later never mutates historical orders.
     shippingInfo: {
-      address: { type: String, required: true },
+      fullName: { type: String, required: true },
+      phone: { type: String, required: true },
+      houseNo: { type: String, default: '' },
+      buildingName: { type: String, default: '' },
+      street: { type: String, required: true },
+      landmark: { type: String, default: '' },
       city: { type: String, required: true },
       state: { type: String, required: true },
+      pincode: { type: String, required: true },
       country: { type: String, required: true },
-      pinCode: { type: Number, required: true },
-      phoneNo: { type: Number, required: true },
+      addressType: { type: String, default: 'Home' },
+      // Legacy fields — retained so historical orders and existing readers
+      // (emails, order-confirmed page) keep resolving. Populated on new orders.
+      address: { type: String },
+      pinCode: { type: Number },
+      phoneNo: { type: Number },
     },
     orderItems: [
       {

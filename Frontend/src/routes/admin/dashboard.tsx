@@ -68,14 +68,23 @@ function AdminDashboardRoute() {
                     <tr>
                       <th className="px-4 py-3 text-left">Order ID</th>
                       <th className="px-4 py-3 text-left">Customer</th>
+                      <th className="px-4 py-3 text-left">Ship To</th>
+                      <th className="px-4 py-3 text-left">Payment</th>
                       <th className="px-4 py-3 text-left">Status</th>
                       <th className="px-4 py-3 text-right">Total</th>
                       <th className="px-4 py-3 text-right">Created</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {stats.recentOrders.map((o) => (
-                      <tr key={o._id} className="border-t border-border/30">
+                    {stats.recentOrders.map((o) => {
+                      const s = o.shippingInfo ?? {};
+                      const line = [s.houseNo, s.buildingName, s.street, s.landmark, s.address]
+                        .filter(Boolean)
+                        .join(", ");
+                      const phone = s.phone ?? (s.phoneNo ? String(s.phoneNo) : "");
+                      const pin = s.pincode ?? (s.pinCode ? String(s.pinCode) : "");
+                      return (
+                      <tr key={o._id} className="border-t border-border/30 align-top">
                         <td className="px-4 py-3 font-mono text-[11px]">{o._id.slice(-8)}</td>
                         <td className="px-4 py-3">
                           {o.user?.name ?? <span className="text-muted-foreground">unknown</span>}
@@ -84,6 +93,35 @@ function AdminDashboardRoute() {
                               {o.user.email}
                             </span>
                           )}
+                        </td>
+                        <td className="px-4 py-3 max-w-[260px]">
+                          {s.fullName || line ? (
+                            <>
+                              {s.fullName && (
+                                <span className="block font-medium">{s.fullName}</span>
+                              )}
+                              {phone && (
+                                <span className="block text-[11px] text-muted-foreground">
+                                  {phone}
+                                </span>
+                              )}
+                              {line && (
+                                <span className="block text-[11px] text-muted-foreground">
+                                  {line}
+                                </span>
+                              )}
+                              <span className="block text-[11px] text-muted-foreground">
+                                {[s.city, s.state, pin].filter(Boolean).join(", ")}
+                              </span>
+                            </>
+                          ) : (
+                            <span className="text-[11px] text-muted-foreground">—</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="inline-flex rounded-full bg-muted px-2 py-0.5 text-[11px] uppercase tracking-wider text-muted-foreground">
+                            {o.paymentInfo?.status ?? "—"}
+                          </span>
                         </td>
                         <td className="px-4 py-3">
                           <span className="inline-flex rounded-full bg-accent/40 px-2 py-0.5 text-[11px] uppercase tracking-wider">
@@ -97,7 +135,8 @@ function AdminDashboardRoute() {
                           {new Date(o.createdAt).toLocaleString()}
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

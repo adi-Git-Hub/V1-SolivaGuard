@@ -84,11 +84,33 @@ export function useAddAddress() {
   });
 }
 
+export function useUpdateAddress() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...address }: { id: string } & Record<string, unknown>) =>
+      api.put<EnvelopedResponse<unknown>>(`/profile/addresses/${id}`, address),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: profileKeys.addresses() });
+    },
+  });
+}
+
 export function useDeleteAddress() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) =>
       api.delete<EnvelopedResponse<unknown>>(`/profile/addresses/${id}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: profileKeys.addresses() });
+    },
+  });
+}
+
+export function useSetDefaultAddress() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      api.put<EnvelopedResponse<unknown>>(`/profile/addresses/${id}/default`, {}),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: profileKeys.addresses() });
     },

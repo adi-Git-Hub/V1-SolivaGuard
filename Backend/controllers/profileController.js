@@ -74,6 +74,11 @@ exports.deleteAddress = catchAsyncErrors(async (req, res, next) => {
   return sendResponse(res, { message: 'Address deleted successfully' });
 });
 
+exports.setDefaultAddress = catchAsyncErrors(async (req, res, next) => {
+  const address = await addressService.setDefaultAddress(req.params.id, req.user.id);
+  return sendResponse(res, { data: { address } });
+});
+
 // --- Support Tickets ---
 
 exports.getTickets = catchAsyncErrors(async (req, res, next) => {

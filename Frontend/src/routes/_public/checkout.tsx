@@ -39,6 +39,11 @@ import {
 import { useSession } from "@/features/auth/hooks/useSession";
 import { useCheckoutStore } from "@/features/checkout/store";
 import { useCreateOrder, useVerifyPayment } from "@/features/orders/api";
+import { useAddresses, useAddAddress } from "@/features/user/profile-api";
+import {
+  AddressFormModal,
+  type AddressForm as SavedAddressForm,
+} from "@/features/user/components/AddressFormModal";
 import { openRazorpayCheckout } from "@/features/payments/razorpay";
 import type { RazorpayHandlerResponse } from "@/features/payments/razorpay";
 import { ease, useIsMobile } from "@/design-system";
@@ -199,6 +204,29 @@ function CheckoutRoute() {
   const createOrder = useCreateOrder();
   const verifyPayment = useVerifyPayment();
 
+  // ── Saved-address book integration (logged-in users) ──
+  const isLoggedIn = !!session?.user;
+  const { data: savedAddresses = [] } = useAddresses();
+  const addAddressMut = useAddAddress();
+  type SavedAddr = SavedAddressForm & { _id?: string; id?: string };
+  const savedList = (isLoggedIn ? savedAddresses : []) as SavedAddr[];
+  const savedId = (a: SavedAddr) => (a._id ?? a.id) as string;
+  const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
+  // "new" = type a fresh address inline; "saved" = pick from the book.
+  const [addressMode, setAddressMode] = useState<"saved" | "new">("new");
+  const [addAddrOpen, setAddAddrOpen] = useState(false);
+  const selectedAddress = savedList.find((a) => savedId(a) === selectedAddressId) ?? null;
+
+  // Auto-select the default saved address the first time the book loads.
+  useEffect(() => {
+    if (!savedList.length) return;
+    if (selectedAddressId) return;
+    const def = savedList.find((a) => a.isDefault) ?? savedList[0];
+    setSelectedAddressId(savedId(def));
+    setAddressMode("saved");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [savedList.length]);
+
   const isMobile = useIsMobile();
   const reveal = isMobile ? mobileReveal : sectionReveal;
 
@@ -273,7 +301,10 @@ function CheckoutRoute() {
     orderType === "self" ||
     (["recipientName", "recipientPhone"] as FieldName[]).every(fieldOk) &&
       validateField("recipientEmail", form.recipientEmail) === "";
-  const shippingValid = (["address", "city", "state", "pinCode", "country"] as FieldName[]).every(fieldOk);
+  const manualShippingValid = (["address", "city", "state", "pinCode", "country"] as FieldName[]).every(fieldOk);
+  // A selected saved address is already validated server-side; otherwise the
+  // inline manual form must be valid.
+  const shippingValid = addressMode === "saved" ? !!selectedAddress : manualShippingValid;
   const isReadyToPay = contactValid && recipientValid && shippingValid && !!activePayment;
 
   const stageLabel =
@@ -507,17 +538,59 @@ function CheckoutRoute() {
         image: i.image.startsWith("http") ? i.image : `${window.location.origin}${i.image}`,
       }));
 
-      // Delivery contact = recipient phone when gifting, else the buyer's phone.
-      const deliveryPhone = orderType === "gift" ? to10(form.recipientPhone) : to10(form.phone);
+      // Build an immutable shipping snapshot from the chosen source: a selected
+      // saved address, otherwise the inline manual form. Either way we emit the
+      // full structured shape PLUS legacy mirrors (address/pinCode/phoneNo) so
+      // older readers keep working.
+      const useSaved = addressMode === "saved" && selectedAddress;
+      const snapName = useSaved
+        ? selectedAddress!.fullName
+        : orderType === "gift"
+          ? form.recipientName.trim()
+          : form.fullName.trim();
+      const snapPhone = useSaved
+        ? to10(selectedAddress!.phone)
+        : orderType === "gift"
+          ? to10(form.recipientPhone)
+          : to10(form.phone);
+
+      const shippingInfo = useSaved
+        ? {
+            fullName: snapName,
+            phone: snapPhone,
+            houseNo: selectedAddress!.houseNo || "",
+            buildingName: selectedAddress!.buildingName || "",
+            street: selectedAddress!.street,
+            landmark: selectedAddress!.landmark || "",
+            city: selectedAddress!.city,
+            state: selectedAddress!.state,
+            pincode: onlyDigits(selectedAddress!.pincode),
+            country: selectedAddress!.country || "India",
+            addressType: selectedAddress!.addressType || "Home",
+          }
+        : {
+            fullName: snapName,
+            phone: snapPhone,
+            houseNo: "",
+            buildingName: "",
+            street: form.address.trim(),
+            landmark: "",
+            city: form.city.trim(),
+            state: form.state.trim(),
+            pincode: onlyDigits(form.pinCode),
+            country: form.country.trim() || "India",
+            addressType: "Home" as const,
+          };
 
       const payload = {
         shippingInfo: {
-          address: form.address.trim(),
-          city: form.city.trim(),
-          state: form.state.trim(),
-          country: form.country.trim(),
-          pinCode: parseInt(onlyDigits(form.pinCode)) || 110001,
-          phoneNo: parseInt(deliveryPhone) || 9999999999,
+          ...shippingInfo,
+          // legacy mirrors
+          address: [shippingInfo.houseNo, shippingInfo.buildingName, shippingInfo.street, shippingInfo.landmark]
+            .filter(Boolean)
+            .join(", "),
+          pinCode: parseInt(shippingInfo.pincode) || 110001,
+          phoneNo: parseInt(shippingInfo.phone) || 9999999999,
         },
         orderItems,
         itemsPrice: subtotal,
@@ -526,12 +599,7 @@ function CheckoutRoute() {
         totalPrice: total,
       };
 
-      // ── temp instrumentation (Phase 1 audit) ──
-      console.log("Checkout Payload:", payload);
-
       const res = await createOrder.mutateAsync(payload);
-
-      console.log("Create Order Response:", res);
 
       // Robust response guard — never silently fail on a missing payment session.
       if (!res?.order) {
@@ -547,9 +615,9 @@ function CheckoutRoute() {
       const orderId = res.order.id ?? res.order._id;
 
       const prefill: Record<string, string> = {
-        name: orderType === "gift" ? form.recipientName : form.fullName,
+        name: snapName || form.fullName,
         email: form.email,
-        contact: deliveryPhone,
+        contact: snapPhone,
       };
       if (activePayment === "upi" && upiId) prefill.vpa = upiId;
 
@@ -596,8 +664,6 @@ function CheckoutRoute() {
           },
         },
       };
-
-      console.log("Razorpay Config:", options);
 
       setStage("connect");
       await openRazorpayCheckout(options);
@@ -877,6 +943,90 @@ function CheckoutRoute() {
                   {expandedSection === 2 && (
                     <Expand>
                       <div className="pt-6 sm:pt-8 space-y-5">
+                        {/* ── Saved addresses (logged-in users) ── */}
+                        {isLoggedIn && savedList.length > 0 && (
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                              <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-muted font-bold">
+                                Saved addresses
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => setAddressMode("new")}
+                                className="font-mono text-[10px] uppercase tracking-[0.16em] text-orange-glow font-bold hover:underline"
+                              >
+                                Enter a new address
+                              </button>
+                            </div>
+                            <div className="grid grid-cols-1 gap-3">
+                              {savedList.map((a) => {
+                                const id = savedId(a);
+                                const active = addressMode === "saved" && selectedAddressId === id;
+                                return (
+                                  <button
+                                    type="button"
+                                    key={id}
+                                    onClick={() => {
+                                      setSelectedAddressId(id);
+                                      setAddressMode("saved");
+                                    }}
+                                    className={`text-left rounded-2xl border p-4 transition-colors ${
+                                      active
+                                        ? "border-orange-glow bg-orange-glow/[0.05]"
+                                        : "border-line-soft hover:border-orange-glow/40"
+                                    }`}
+                                  >
+                                    <div className="mb-1 flex flex-wrap items-center gap-2">
+                                      <span className="font-mono text-[10px] uppercase tracking-widest text-brown-deep font-black">
+                                        {a.fullName}
+                                      </span>
+                                      <span className="rounded-full border border-brown-deep/10 bg-brown-deep/5 px-2 py-0.5 font-mono text-[9px] uppercase tracking-widest text-brown-deep">
+                                        {a.addressType || "Home"}
+                                      </span>
+                                      {a.isDefault && (
+                                        <span className="rounded-full border border-orange-glow/20 bg-orange-glow/10 px-2 py-0.5 font-mono text-[9px] uppercase tracking-widest text-orange-glow">
+                                          Default
+                                        </span>
+                                      )}
+                                    </div>
+                                    <p className="text-[13px] leading-relaxed text-ink-muted">
+                                      {[a.houseNo, a.buildingName, a.street, a.landmark]
+                                        .filter(Boolean)
+                                        .join(", ")}
+                                      , {a.city}, {a.state} {a.pincode} · {a.phone}
+                                    </p>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setAddAddrOpen(true)}
+                              className="w-full rounded-2xl border border-dashed border-orange-glow/30 py-3 font-mono text-[11px] uppercase tracking-widest text-orange-glow font-bold hover:bg-orange-glow/[0.05]"
+                            >
+                              + Add new address
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Prompt to save one when logged in with an empty book */}
+                        {isLoggedIn && savedList.length === 0 && (
+                          <div className="rounded-2xl border border-dashed border-line-soft bg-cream/40 p-4 text-center">
+                            <p className="mb-2 text-[13px] text-ink-muted">
+                              No saved addresses yet — add one for faster checkout next time.
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => setAddAddrOpen(true)}
+                              className="font-mono text-[11px] uppercase tracking-widest text-orange-glow font-bold hover:underline"
+                            >
+                              + Save an address
+                            </button>
+                          </div>
+                        )}
+
+                        {addressMode === "new" && (
+                        <div className="space-y-5">
                         <motion.button
                           whileHover={{ scale: 1.01 }}
                           whileTap={{ scale: 0.98 }}
@@ -947,6 +1097,8 @@ function CheckoutRoute() {
                             placeholder="India"
                           />
                         </div>
+                        </div>
+                        )}
                         <ContinueButton
                           disabled={!shippingValid}
                           label="Continue to payment"
@@ -1350,6 +1502,31 @@ function CheckoutRoute() {
       />
 
       <UnsavedChangesGuard when={formDirty} />
+
+      {/* Add a new address without leaving checkout */}
+      <AddressFormModal
+        open={addAddrOpen}
+        onClose={() => setAddAddrOpen(false)}
+        title="Add Address"
+        initial={{
+          fullName: form.fullName,
+          phone: form.phone,
+        }}
+        saving={addAddressMut.isPending}
+        onSubmit={async (data) => {
+          try {
+            const created: any = await addAddressMut.mutateAsync(data);
+            const newId = created?.data?.address?._id ?? created?.data?.address?.id;
+            if (newId) {
+              setSelectedAddressId(newId);
+              setAddressMode("saved");
+            }
+            setAddAddrOpen(false);
+          } catch {
+            /* mutation surfaces its own error; keep modal open */
+          }
+        }}
+      />
     </div>
   );
 }

@@ -15,12 +15,21 @@ export const orderItemSchema = z.object({
 export type OrderItem = z.infer<typeof orderItemSchema>;
 
 export const shippingInfoSchema = z.object({
-  address: z.string().min(1),
+  fullName: z.string().min(2),
+  phone: z.string(),
+  houseNo: z.string().optional().default(""),
+  buildingName: z.string().optional().default(""),
+  street: z.string().min(1),
+  landmark: z.string().optional().default(""),
   city: z.string().min(1),
   state: z.string().min(1),
   country: z.string().min(1),
-  pinCode: z.number().int(),
-  phoneNo: z.number().int(),
+  pincode: z.string(),
+  addressType: z.string().optional().default("Home"),
+  // Legacy mirrors — kept so older orders & existing readers still parse.
+  address: z.string().optional(),
+  pinCode: z.number().int().optional(),
+  phoneNo: z.number().int().optional(),
 });
 export type ShippingInfo = z.infer<typeof shippingInfoSchema>;
 

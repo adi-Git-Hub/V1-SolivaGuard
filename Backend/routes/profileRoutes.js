@@ -15,6 +15,7 @@ const {
   addAddress,
   updateAddress,
   deleteAddress,
+  setDefaultAddress,
   getTickets,
   getTicketDetails,
   createTicket,
@@ -42,6 +43,7 @@ router.post('/recent', validate(profileValidator.trackProductView), trackProduct
 // --- Addresses ---
 router.get('/addresses', getAddresses);
 router.post('/addresses', validate(profileValidator.addAddress), addAddress);
+router.put('/addresses/:id/default', validate(profileValidator.setDefaultAddress), setDefaultAddress);
 router.put('/addresses/:id', validate(profileValidator.updateAddress), updateAddress);
 router.delete('/addresses/:id', validate(profileValidator.deleteAddress), deleteAddress);
 

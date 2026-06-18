@@ -7,15 +7,27 @@ class AddressService {
   }
 
   async addAddress(userId, addressData) {
-    if (addressData.isDefault) {
+    const existing = await addressRepository.findByUserId(userId);
+    const isFirst = existing.length === 0;
+    // First address is always the default; otherwise honour the requested flag.
+    const makeDefault = isFirst || !!addressData.isDefault;
+    if (makeDefault) {
       await addressRepository.unsetDefaults(userId);
     }
-    return await addressRepository.create({ ...addressData, user: userId });
+    return await addressRepository.create({
+      ...addressData,
+      isDefault: makeDefault,
+      label: addressData.addressType || addressData.label || 'Home',
+      user: userId,
+    });
   }
 
   async updateAddress(id, userId, updateData) {
     if (updateData.isDefault) {
       await addressRepository.unsetDefaults(userId);
+    }
+    if (updateData.addressType) {
+      updateData.label = updateData.addressType; // keep legacy label in sync
     }
     const address = await addressRepository.update(id, userId, updateData);
     if (!address) throw new ErrorHandler('Address not found', 404);

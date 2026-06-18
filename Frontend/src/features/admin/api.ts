@@ -9,6 +9,24 @@ type RecentOrder = {
   orderStatus: string;
   createdAt: string;
   user?: { name?: string; email?: string } | null;
+  paymentInfo?: { status?: string } | null;
+  shippingInfo?: {
+    fullName?: string;
+    phone?: string;
+    houseNo?: string;
+    buildingName?: string;
+    street?: string;
+    landmark?: string;
+    city?: string;
+    state?: string;
+    pincode?: string;
+    country?: string;
+    addressType?: string;
+    // legacy
+    address?: string;
+    pinCode?: number;
+    phoneNo?: number;
+  } | null;
 };
 
 export type AdminStats = {

@@ -4,12 +4,21 @@ const orderValidator = {
   createOrder: z.object({
     body: z.object({
       shippingInfo: z.object({
-        address: z.string().min(1, 'Address is required'),
+        fullName: z.string().min(2, 'Full name is required'),
+        phone: z.string().regex(/^[6-9]\d{9}$/, 'Invalid phone number'),
+        houseNo: z.string().optional(),
+        buildingName: z.string().optional(),
+        street: z.string().min(1, 'Street is required'),
+        landmark: z.string().optional(),
         city: z.string().min(1, 'City is required'),
         state: z.string().min(1, 'State is required'),
         country: z.string().min(1, 'Country is required'),
-        pinCode: z.number().int().min(100000, 'Invalid Pin Code').max(999999, 'Invalid Pin Code'),
-        phoneNo: z.number().int().min(6000000000, 'Invalid Phone Number').max(9999999999, 'Invalid Phone Number'),
+        pincode: z.string().regex(/^[1-9]\d{5}$/, 'Invalid pincode'),
+        addressType: z.enum(['Home', 'Work', 'Other']).optional(),
+        // Legacy mirrors (optional) — sent for back-compat with old readers.
+        address: z.string().optional(),
+        pinCode: z.number().int().optional(),
+        phoneNo: z.number().int().optional(),
       }),
       orderItems: z.array(z.object({
         name: z.string().min(1, 'Item name is required'),
