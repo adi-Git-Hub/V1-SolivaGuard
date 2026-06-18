@@ -37,7 +37,7 @@ const LEFT: HalfData = {
     "Designed for coverage, not exposure",
   ],
   footer: "Everyday adjustment became everyday habit.",
-  image: "/product_images/Gemini_Generated_Image_e61dwqe61dwqe61d.png",
+  image: "/IMG_6255.webp",
   alt: "Traditional dupatta wrapped over the face — borrowed protection that slips and needs constant adjustment",
 };
 
@@ -53,7 +53,7 @@ const RIGHT: HalfData = {
     "Built for everyday exposure",
   ],
   footer: "Protection should quietly work in the background.",
-  image: "/DSC05489.webp",
+  image: "/IMG_3739.webp",
   alt: "Soliva Protection System designed for everyday movement and exposure",
 };
 

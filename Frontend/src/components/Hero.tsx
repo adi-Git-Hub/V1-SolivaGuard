@@ -118,7 +118,7 @@ export function Hero({ isRevealed = false }: { isRevealed?: boolean }) {
 
           {/* ════ DESKTOP HERO (desktop only): the landscape banner ════ */}
           <img
-            src="/homepage-banner.webp"
+            src="/hero-poster.webp"
             alt="Soliva — Thoughtful protection for everyday life"
             loading="eager"
             fetchPriority="high"
