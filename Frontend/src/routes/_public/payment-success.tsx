@@ -103,6 +103,9 @@ function PaymentSuccessRoute() {
           </button>
           .
         </p>
+        <p className="mt-2 text-center text-[12px] font-bold text-brown-deep">
+          You can also check your product details in your registered email.
+        </p>
 
         {/* Order summary card */}
         <motion.div
