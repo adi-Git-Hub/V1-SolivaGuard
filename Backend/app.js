@@ -17,6 +17,12 @@ const bullBoardAdapter = require('./utils/bullBoard');
 
 const app = express();
 
+// Trust the first upstream proxy (nginx). Without this, Express ignores
+// X-Forwarded-Proto, so req.protocol is always "http" even on HTTPS requests.
+// This means URLs built with req.protocol (e.g. avatar uploads) get stored
+// as http:// and the browser blocks them as mixed content from the HTTPS page.
+app.set('trust proxy', 1);
+
 // Request Tracing (Request IDs & Performance Logging)
 app.use(tracing);
 

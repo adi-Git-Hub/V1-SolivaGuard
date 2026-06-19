@@ -51,7 +51,8 @@ function normalizeUser(raw: unknown): User {
     isVerified: r.isVerified,
     username: r.username,
     phoneNumber: (r.phoneNumber as string | null | undefined) ?? null,
-    avatarUrl: (r.avatarUrl as string | null | undefined) ?? null,
+    avatarUrl: ((r.avatarUrl as string | null | undefined) ?? null)
+      ?.replace(/^http:\/\//, 'https://') ?? null,
     createdAt: (r.createdAt as string | null | undefined) ?? null,
     sessionsCount: Array.isArray(r.loginSessions) ? r.loginSessions.length : undefined,
   });

@@ -35,8 +35,11 @@ exports.updateAvatar = catchAsyncErrors(async (req, res, next) => {
     }
   }
 
-  // Public URL the browser can reach via app.js → app.use('/uploads', static)
-  const publicUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+  // Build a fully-qualified HTTPS URL. When behind nginx (which sets
+  // X-Forwarded-Proto: https), trust proxy makes req.protocol return "https".
+  // We also read the header directly as a belt-and-suspenders guard.
+  const proto = req.get('x-forwarded-proto') || req.protocol;
+  const publicUrl = `${proto}://${req.get('host')}/uploads/${req.file.filename}`;
   user.avatarUrl = publicUrl;
   await user.save({ validateBeforeSave: false });
 
