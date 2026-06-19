@@ -113,8 +113,8 @@ export function PixelTransition({
       aria-label={ariaLabel}
       onMouseEnter={!isTouchDevice ? handleEnter : undefined}
       onMouseLeave={!isTouchDevice ? handleLeave : undefined}
-      onFocus={handleEnter}
-      onBlur={handleLeave}
+      onFocus={!isTouchDevice ? handleEnter : undefined}
+      onBlur={!isTouchDevice ? handleLeave : undefined}
       onClick={isTouchDevice ? handleClick : undefined}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
