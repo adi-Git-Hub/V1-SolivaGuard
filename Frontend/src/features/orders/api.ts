@@ -33,13 +33,19 @@ export const orderKeys = {
   byId: (id: string) => ["orders", "id", id] as const,
 };
 
+// Mongo serializes documents with `_id` (no `id`). Normalize so the whole UI
+// can rely on `order.id` for routing/keys.
+function normalizeOrder(o: any): Order {
+  return { ...o, id: (o?.id ?? o?._id ?? "") as string };
+}
+
 // ── Reads ──
 export function useMyOrders() {
   return useQuery({
     queryKey: orderKeys.mine(),
     queryFn: async () => {
       const res = await api.get<EnvelopedResponse<{ orders: Order[] }>>("/orders/me");
-      return res.data.orders;
+      return (res.data.orders ?? []).map(normalizeOrder);
     },
     staleTime: 30_000,
   });
@@ -50,7 +56,7 @@ export function useOrder(orderId: string) {
     queryKey: orderKeys.byId(orderId),
     queryFn: async () => {
       const res = await api.get<EnvelopedResponse<{ order: Order }>>(`/orders/${orderId}`);
-      return res.data.order;
+      return normalizeOrder(res.data.order);
     },
     enabled: Boolean(orderId),
     staleTime: 30_000,

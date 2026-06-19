@@ -22,6 +22,17 @@ export const Route = createFileRoute("/_public/profile/orders/$id")({
 const inr = (n: number) =>
   "₹" + Number(n || 0).toLocaleString("en-IN", { maximumFractionDigits: 2 });
 
+const variantOf = (name: string) => (name.includes("—") ? name.split("—").pop()?.trim() : "");
+
+function Summary({ k, v }: { k: string; v: string }) {
+  return (
+    <div>
+      <p className="mb-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-ink-muted font-bold">{k}</p>
+      <p className="text-[13px] font-semibold text-brown-deep break-words">{v}</p>
+    </div>
+  );
+}
+
 function Card({ title, icon: Icon, children }: { title: string; icon: any; children: React.ReactNode }) {
   return (
     <div className="rounded-3xl border border-brown-deep/8 bg-white p-6 sm:p-7 shadow-[0_24px_60px_-44px_rgba(58,42,34,0.5)]">
@@ -118,8 +129,30 @@ function OrderDetailsRoute() {
         </div>
 
         <div className="space-y-6">
+          {/* Order Summary */}
+          <Card title="Order Summary" icon={FileText}>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3">
+              <Summary k="Order ID" v={`#${order.id.slice(-10).toUpperCase()}`} />
+              <Summary k="Invoice No." v={order.invoiceNumber || "Generating…"} />
+              <Summary k="Receipt No." v={order.receiptNumber || "Generating…"} />
+              <Summary
+                k="Placed On"
+                v={order.createdAt ? new Date(order.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—"}
+              />
+              <Summary
+                k="Est. Delivery"
+                v={
+                  order.orderStatus === "delivered"
+                    ? "Delivered"
+                    : new Date((order.createdAt ? new Date(order.createdAt).getTime() : Date.now()) + 6 * 86400000).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })
+                }
+              />
+              <Summary k="Items" v={`${order.orderItems.length} product${order.orderItems.length > 1 ? "s" : ""}`} />
+            </div>
+          </Card>
+
           {/* Products */}
-          <Card title="Products" icon={Package}>
+          <Card title="Product Information" icon={Package}>
             <div className="space-y-4">
               {order.orderItems.map((it, i) => (
                 <div key={i} className="flex items-center gap-4">
@@ -128,7 +161,10 @@ function OrderDetailsRoute() {
                   )}
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-medium">{it.name}</p>
-                    <p className="text-[12px] text-ink-muted">Qty: {it.quantity}</p>
+                    <p className="text-[12px] text-ink-muted">
+                      {variantOf(it.name) && <span>Color: {variantOf(it.name)} · </span>}
+                      Qty: {it.quantity} · {inr(it.price)} each
+                    </p>
                   </div>
                   <p className="font-display">{inr((it.price || 0) * it.quantity)}</p>
                 </div>

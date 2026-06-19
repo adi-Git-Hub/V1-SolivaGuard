@@ -105,43 +105,46 @@ export function OrdersTab() {
                       {first?.name || "Soliva Protection"}
                     </h4>
                     <p className="text-[12px] text-ink-muted">
-                      {variantOf(first?.name || "") && <span>{variantOf(first!.name)} · </span>}
-                      {date} · {order.orderItems.length} item{order.orderItems.length > 1 ? "s" : ""}
+                      {variantOf(first?.name || "") && <span>Color: {variantOf(first!.name)} · </span>}
+                      Qty: {first?.quantity ?? 1} · {date}
                     </p>
                   </div>
 
                   {/* total */}
                   <div className="sm:text-right">
                     <span className="block font-mono text-[9px] tracking-cta text-ink-muted uppercase font-bold mb-0.5">
-                      Total
+                      Total Paid
                     </span>
                     <span className="font-display text-xl text-brown-deep font-bold tracking-tight">
                       {formatMoney(Math.round(order.totalPrice * 100), "INR")}
                     </span>
+                    <span className="block text-[11px] text-ink-muted">
+                      Subtotal {formatMoney(Math.round((order.itemsPrice || order.totalPrice) * 100), "INR")}
+                    </span>
                   </div>
                 </div>
 
-                {/* CTAs */}
-                <div className="mt-5 flex flex-wrap gap-2.5 border-t border-line-soft pt-4">
+                {/* CTAs — one clean row on desktop, 2-col touch grid on mobile */}
+                <div className="mt-5 grid grid-cols-2 gap-2.5 border-t border-line-soft pt-4 sm:flex sm:flex-wrap">
                   <Link
                     to="/profile/orders/$id"
                     params={{ id: order.id }}
-                    className="inline-flex items-center gap-1.5 rounded-full bg-brown-deep px-4 py-2 font-mono text-[10px] font-bold uppercase tracking-widest text-white"
+                    className="inline-flex h-10 items-center justify-center gap-1.5 rounded-full bg-brown-deep px-4 font-mono text-[10px] font-bold uppercase tracking-widest text-white active:scale-95"
                   >
                     View Details <ChevronRight className="h-3.5 w-3.5" />
                   </Link>
                   <Link
                     to="/profile/orders/$id"
                     params={{ id: order.id }}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-line-strong px-4 py-2 font-mono text-[10px] font-bold uppercase tracking-widest text-ink-muted hover:text-brown-deep"
+                    className="inline-flex h-10 items-center justify-center gap-1.5 rounded-full border border-line-strong px-4 font-mono text-[10px] font-bold uppercase tracking-widest text-ink-muted hover:text-brown-deep active:scale-95"
                   >
-                    <MapPin className="h-3.5 w-3.5" /> Track
+                    <MapPin className="h-3.5 w-3.5" /> Track Order
                   </Link>
                   <a
                     href={invoiceHref}
                     target="_blank"
                     rel="noreferrer"
-                    className={`inline-flex items-center gap-1.5 rounded-full border border-line-strong px-4 py-2 font-mono text-[10px] font-bold uppercase tracking-widest text-ink-muted hover:text-brown-deep ${!invoiceHref ? "pointer-events-none opacity-40" : ""}`}
+                    className={`inline-flex h-10 items-center justify-center gap-1.5 rounded-full border border-line-strong px-4 font-mono text-[10px] font-bold uppercase tracking-widest text-ink-muted hover:text-brown-deep active:scale-95 ${!invoiceHref ? "pointer-events-none opacity-40" : ""}`}
                   >
                     <FileText className="h-3.5 w-3.5" /> Invoice
                   </a>
@@ -149,7 +152,7 @@ export function OrdersTab() {
                     href={receiptHref}
                     target="_blank"
                     rel="noreferrer"
-                    className={`inline-flex items-center gap-1.5 rounded-full border border-line-strong px-4 py-2 font-mono text-[10px] font-bold uppercase tracking-widest text-ink-muted hover:text-brown-deep ${!receiptHref ? "pointer-events-none opacity-40" : ""}`}
+                    className={`inline-flex h-10 items-center justify-center gap-1.5 rounded-full border border-line-strong px-4 font-mono text-[10px] font-bold uppercase tracking-widest text-ink-muted hover:text-brown-deep active:scale-95 ${!receiptHref ? "pointer-events-none opacity-40" : ""}`}
                   >
                     <Receipt className="h-3.5 w-3.5" /> Receipt
                   </a>

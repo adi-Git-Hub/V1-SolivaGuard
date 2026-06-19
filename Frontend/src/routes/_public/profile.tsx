@@ -241,6 +241,8 @@ function ProfilePage() {
                   />
                   <span className="font-mono text-[11px] tracking-eyebrow uppercase font-bold">
                     {link.label}
+                    {link.id === "orders" && orders.length > 0 && ` (${orders.length})`}
+                    {link.id === "addresses" && addresses.length > 0 && ` (${addresses.length})`}
                   </span>
                   {activeTab === link.id && (
                     <motion.div layoutId="tab-indicator" className="ml-auto">

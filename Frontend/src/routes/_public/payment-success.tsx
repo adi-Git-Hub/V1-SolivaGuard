@@ -93,11 +93,16 @@ function PaymentSuccessRoute() {
             <Receipt className="h-4 w-4" /> Receipt
           </a>
         </div>
-        {!invoiceHref && !isLoading && (
-          <p className="mt-2 text-center text-[11px] text-ink-muted">
-            Your invoice & receipt are being prepared — they'll appear in your order details shortly.
-          </p>
-        )}
+        <p className="mt-3 text-center text-[12px] text-ink-muted">
+          Your Invoice and Receipt are now available in{" "}
+          <button
+            onClick={() => navigate({ to: "/profile" })}
+            className="font-semibold text-orange-glow underline-offset-2 hover:underline"
+          >
+            Profile → Orders
+          </button>
+          .
+        </p>
 
         {/* Order summary card */}
         <motion.div
