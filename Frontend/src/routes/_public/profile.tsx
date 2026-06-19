@@ -24,15 +24,13 @@ import {
   Gift,
   Pencil,
   Clock,
-  Zap,
-  Crown,
   Sparkles,
   ArrowUpRight,
   Truck,
-  Headset,
   FileText,
   Receipt,
 } from "lucide-react";
+import { OutdoorIntelligence } from "@/features/weather/OutdoorIntelligence";
 import { useSession } from "@/features/auth/hooks/useSession";
 import { useLogout } from "@/features/auth/api";
 import { useRemoveAvatar, useUpdateAvatar } from "@/features/user/api";
@@ -418,32 +416,10 @@ function ProfilePage() {
                         </div>
                       </section>
 
-                      <section className="rounded-2xl sm:rounded-panel border border-line-hairline bg-gradient-to-br from-surface-panel to-[#f7efe4]/60 p-5 sm:p-7 backdrop-blur-medium shadow-sm">
-                        <SectionTitle icon={Crown} eyebrow="Membership">
-                          Member benefits
-                        </SectionTitle>
-                        <div className="mt-5 space-y-2.5">
-                          {[
-                            { icon: Zap, label: "Fast Checkout", sub: "Saved details & one-tap pay" },
-                            { icon: Headset, label: "Priority Support", sub: "Faster response times" },
-                            { icon: Sparkles, label: "Early Access", sub: "Shop drops before anyone" },
-                            { icon: Gift, label: "Exclusive Launches", sub: "Members-only editions" },
-                          ].map((b) => (
-                            <div
-                              key={b.label}
-                              className="flex items-center gap-3 rounded-xl border border-line-hairline bg-white/55 px-3.5 py-2.5 transition-all duration-300 hover:bg-white/85"
-                            >
-                              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-orange-glow/10 text-orange-glow">
-                                <b.icon className="h-3.5 w-3.5" />
-                              </span>
-                              <div className="min-w-0">
-                                <p className="text-[13px] font-medium text-brown-deep leading-tight">{b.label}</p>
-                                <p className="text-[11px] font-light text-ink-muted/70 leading-tight">{b.sub}</p>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </section>
+                      <OutdoorIntelligence
+                        city={defaultAddress?.city}
+                        state={defaultAddress?.state}
+                      />
                     </div>
                   </div>
                 )}
