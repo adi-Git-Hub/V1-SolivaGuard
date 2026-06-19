@@ -98,8 +98,22 @@ app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 app.use(cookieParser());
 
-// Static folder for uploads
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// Static folder for uploads. Invoice/receipt PDFs are forced to download with
+// a clean filename (Content-Disposition: attachment) so the email + mobile
+// "Download Invoice/Receipt" links actually save the file instead of opening an
+// inline preview that some mobile/in-app browsers fail to render.
+app.use(
+  '/uploads',
+  express.static(path.join(__dirname, 'uploads'), {
+    setHeaders: (res, filePath) => {
+      if (filePath.includes(`${path.sep}invoices${path.sep}`) && filePath.endsWith('.pdf')) {
+        const base = path.basename(filePath);
+        const niceName = base.startsWith('receipt') ? 'Soliva-Receipt.pdf' : 'Soliva-Invoice.pdf';
+        res.setHeader('Content-Disposition', `attachment; filename="${niceName}"`);
+      }
+    },
+  })
+);
 
 // Custom data sanitization against NoSQL query injection & XSS for Express 5 compatibility
 const sanitizeObject = (obj) => {
