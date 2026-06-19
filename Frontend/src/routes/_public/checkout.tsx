@@ -290,11 +290,18 @@ function CheckoutRoute() {
 
   const upiInputRef = useRef<HTMLInputElement>(null);
 
-  // Which fields are required given the current order type.
+  // A picked saved address already carries valid shipping data — so the inline
+  // form fields are NOT required in that case (either path is accepted).
+  const usingSavedAddress = addressMode === "saved" && !!selectedAddress;
+  const shippingFields: FieldName[] = usingSavedAddress
+    ? []
+    : ["address", "city", "state", "pinCode", "country"];
+
+  // Which fields are required given the current order type + address mode.
   const requiredFields: FieldName[] =
     orderType === "gift"
-      ? ["fullName", "email", "phone", "recipientName", "recipientPhone", "address", "city", "state", "pinCode", "country"]
-      : ["fullName", "email", "phone", "address", "city", "state", "pinCode", "country"];
+      ? ["fullName", "email", "phone", "recipientName", "recipientPhone", ...shippingFields]
+      : ["fullName", "email", "phone", ...shippingFields];
 
   const emailLocked = accountEmailVerified && !editEmail;
   const phoneVerified = !!accountPhone;
@@ -454,6 +461,10 @@ function CheckoutRoute() {
             pinCode: addr.postcode || prev.pinCode,
             country: addr.country || prev.country,
           }));
+          // The detected location becomes the active shipping address — switch
+          // off any selected saved address so this form is what's used.
+          setSelectedAddressId(null);
+          setAddressMode("new");
           toast.success("Location detected");
         } catch {
           toast.error("Could not fetch address. Please enter manually.");
@@ -866,7 +877,7 @@ function CheckoutRoute() {
                           />
                           <OrderTypeOption
                             icon={Gift}
-                            title="Buying For Someone Else"
+                            title="Gifting For Someone"
                             sub="Ship to a recipient"
                             selected={orderType === "gift"}
                             onSelect={() => setOrderType("gift")}
