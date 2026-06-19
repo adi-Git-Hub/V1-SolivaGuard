@@ -518,8 +518,8 @@ function ProfilePage() {
                                 Desktop: one row; mobile: 3-up touch grid. */}
                             <div className="mt-4 grid grid-cols-3 gap-2.5 sm:flex sm:flex-wrap">
                               <Link
-                                to="/profile/orders/$id"
-                                params={{ id: (o._id ?? o.id) as string }}
+                                to="/track/$orderId"
+                                params={{ orderId: (o._id ?? o.id) as string }}
                                 className="inline-flex h-10 items-center justify-center gap-1.5 rounded-full bg-brown-deep px-4 font-mono text-[10px] font-bold uppercase tracking-widest text-white active:scale-95"
                               >
                                 <Truck className="h-3.5 w-3.5" /> Track Order

@@ -29,6 +29,7 @@ import { Route as AuthResetPasswordRouteImport } from './routes/_auth/reset-pass
 import { Route as AuthRegisterRouteImport } from './routes/_auth/register'
 import { Route as AuthLoginRouteImport } from './routes/_auth/login'
 import { Route as AuthForgotPasswordRouteImport } from './routes/_auth/forgot-password'
+import { Route as PublicTrackOrderIdRouteImport } from './routes/_public/track.$orderId'
 import { Route as PublicProductsSlugRouteImport } from './routes/_public/products/$slug'
 import { Route as PublicProfileOrdersIdRouteImport } from './routes/_public/profile.orders.$id'
 
@@ -130,6 +131,11 @@ const AuthForgotPasswordRoute = AuthForgotPasswordRouteImport.update({
   path: '/forgot-password',
   getParentRoute: () => AuthRouteRoute,
 } as any)
+const PublicTrackOrderIdRoute = PublicTrackOrderIdRouteImport.update({
+  id: '/track/$orderId',
+  path: '/track/$orderId',
+  getParentRoute: () => PublicRouteRoute,
+} as any)
 const PublicProductsSlugRoute = PublicProductsSlugRouteImport.update({
   id: '/products/$slug',
   path: '/products/$slug',
@@ -161,6 +167,7 @@ export interface FileRoutesByFullPath {
   '/terms': typeof PublicTermsRoute
   '/admin/dashboard': typeof AdminDashboardRoute
   '/products/$slug': typeof PublicProductsSlugRoute
+  '/track/$orderId': typeof PublicTrackOrderIdRoute
   '/profile/orders/$id': typeof PublicProfileOrdersIdRoute
 }
 export interface FileRoutesByTo {
@@ -183,6 +190,7 @@ export interface FileRoutesByTo {
   '/terms': typeof PublicTermsRoute
   '/admin/dashboard': typeof AdminDashboardRoute
   '/products/$slug': typeof PublicProductsSlugRoute
+  '/track/$orderId': typeof PublicTrackOrderIdRoute
   '/profile/orders/$id': typeof PublicProfileOrdersIdRoute
 }
 export interface FileRoutesById {
@@ -208,6 +216,7 @@ export interface FileRoutesById {
   '/_public/terms': typeof PublicTermsRoute
   '/admin/dashboard': typeof AdminDashboardRoute
   '/_public/products/$slug': typeof PublicProductsSlugRoute
+  '/_public/track/$orderId': typeof PublicTrackOrderIdRoute
   '/_public/profile/orders/$id': typeof PublicProfileOrdersIdRoute
 }
 export interface FileRouteTypes {
@@ -232,6 +241,7 @@ export interface FileRouteTypes {
     | '/terms'
     | '/admin/dashboard'
     | '/products/$slug'
+    | '/track/$orderId'
     | '/profile/orders/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -254,6 +264,7 @@ export interface FileRouteTypes {
     | '/terms'
     | '/admin/dashboard'
     | '/products/$slug'
+    | '/track/$orderId'
     | '/profile/orders/$id'
   id:
     | '__root__'
@@ -278,6 +289,7 @@ export interface FileRouteTypes {
     | '/_public/terms'
     | '/admin/dashboard'
     | '/_public/products/$slug'
+    | '/_public/track/$orderId'
     | '/_public/profile/orders/$id'
   fileRoutesById: FileRoutesById
 }
@@ -430,6 +442,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthForgotPasswordRouteImport
       parentRoute: typeof AuthRouteRoute
     }
+    '/_public/track/$orderId': {
+      id: '/_public/track/$orderId'
+      path: '/track/$orderId'
+      fullPath: '/track/$orderId'
+      preLoaderRoute: typeof PublicTrackOrderIdRouteImport
+      parentRoute: typeof PublicRouteRoute
+    }
     '/_public/products/$slug': {
       id: '/_public/products/$slug'
       path: '/products/$slug'
@@ -490,6 +509,7 @@ interface PublicRouteRouteChildren {
   PublicTechnologyRoute: typeof PublicTechnologyRoute
   PublicTermsRoute: typeof PublicTermsRoute
   PublicProductsSlugRoute: typeof PublicProductsSlugRoute
+  PublicTrackOrderIdRoute: typeof PublicTrackOrderIdRoute
 }
 
 const PublicRouteRouteChildren: PublicRouteRouteChildren = {
@@ -505,6 +525,7 @@ const PublicRouteRouteChildren: PublicRouteRouteChildren = {
   PublicTechnologyRoute: PublicTechnologyRoute,
   PublicTermsRoute: PublicTermsRoute,
   PublicProductsSlugRoute: PublicProductsSlugRoute,
+  PublicTrackOrderIdRoute: PublicTrackOrderIdRoute,
 }
 
 const PublicRouteRouteWithChildren = PublicRouteRoute._addFileChildren(
