@@ -10,8 +10,8 @@ import type { CartLine } from "./schema";
 type CartState = {
   lines: CartLine[];
   add: (line: Omit<CartLine, "quantity"> & { quantity?: number }) => void;
-  remove: (productId: string) => void;
-  setQuantity: (productId: string, quantity: number) => void;
+  remove: (productId: string, variant?: string) => void;
+  setQuantity: (productId: string, quantity: number, variant?: string) => void;
   clear: () => void;
   /** Replace every line in one go. Used after a server cart merge to reset
    * the guest cart to empty without thrashing subscribers. */
@@ -24,11 +24,15 @@ export const useCartStore = create<CartState>()(
       lines: [],
       add: (input) => {
         const quantity = input.quantity ?? 1;
-        const existing = get().lines.find((l) => l.productId === input.productId);
+        const existing = get().lines.find(
+          (l) => l.productId === input.productId && (l.variant ?? "") === (input.variant ?? ""),
+        );
         if (existing) {
           set({
             lines: get().lines.map((l) =>
-              l.productId === input.productId ? { ...l, quantity: l.quantity + quantity } : l,
+              l.productId === input.productId && (l.variant ?? "") === (input.variant ?? "")
+                ? { ...l, quantity: l.quantity + quantity }
+                : l,
             ),
           });
           return;
@@ -36,14 +40,27 @@ export const useCartStore = create<CartState>()(
         const { quantity: _omit, ...rest } = input;
         set({ lines: [...get().lines, { ...rest, quantity }] });
       },
-      remove: (productId) => set({ lines: get().lines.filter((l) => l.productId !== productId) }),
-      setQuantity: (productId, quantity) => {
+      remove: (productId, variant) =>
+        set({
+          lines: get().lines.filter(
+            (l) => !(l.productId === productId && (l.variant ?? "") === (variant ?? "")),
+          ),
+        }),
+      setQuantity: (productId, quantity, variant) => {
         if (quantity <= 0) {
-          set({ lines: get().lines.filter((l) => l.productId !== productId) });
+          set({
+            lines: get().lines.filter(
+              (l) => !(l.productId === productId && (l.variant ?? "") === (variant ?? "")),
+            ),
+          });
           return;
         }
         set({
-          lines: get().lines.map((l) => (l.productId === productId ? { ...l, quantity } : l)),
+          lines: get().lines.map((l) =>
+            l.productId === productId && (l.variant ?? "") === (variant ?? "")
+              ? { ...l, quantity }
+              : l,
+          ),
         });
       },
       clear: () => set({ lines: [] }),

@@ -38,6 +38,7 @@ import {
 
 import { useSession } from "@/features/auth/hooks/useSession";
 import { useCheckoutStore } from "@/features/checkout/store";
+import { useCartStore } from "@/features/cart/store";
 import { useCreateOrder, useVerifyPayment } from "@/features/orders/api";
 import { useAddresses, useAddAddress } from "@/features/user/profile-api";
 import {
@@ -283,7 +284,8 @@ function CheckoutRoute() {
   useEffect(() => {
     if (paymentDone) {
       navigate({ to: "/payment-success" });
-      clear();
+      clear();                              // clear checkout staging
+      useCartStore.getState().clear();      // clear the persisted cart
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paymentDone]);

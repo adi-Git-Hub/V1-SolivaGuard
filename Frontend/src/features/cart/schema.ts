@@ -2,6 +2,7 @@ import { z } from "zod";
 
 export const cartLineSchema = z.object({
   productId: z.string(),
+  variant: z.string().optional(),
   slug: z.string(),
   name: z.string(),
   image: z.string().url(),

@@ -19,8 +19,8 @@ export type CartFacade = {
   isLoading: boolean;
   isSignedIn: boolean;
   add: (line: Omit<CartLine, "quantity"> & { quantity?: number }) => void;
-  remove: (productId: string) => void;
-  setQuantity: (productId: string, quantity: number) => void;
+  remove: (productId: string, variant?: string) => void;
+  setQuantity: (productId: string, quantity: number, variant?: string) => void;
   clear: () => void;
 };
 

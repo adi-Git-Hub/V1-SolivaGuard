@@ -217,7 +217,8 @@ function CollectionRoute() {
   const addToCart = () => {
     cart.add({
       productId: "soliva-sunwrap",
-      slug: "soliva-sunwrap",
+      variant: edition.id,
+      slug: edition.id,
       name: `SunWrap by Soliva — ${edition.name}`,
       image: edition.images[0].src,
       priceCents: 79900,
