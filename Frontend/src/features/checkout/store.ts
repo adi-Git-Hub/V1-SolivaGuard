@@ -3,6 +3,7 @@ import { persist } from "zustand/middleware";
 
 export type CheckoutItem = {
   productId: string;
+  variant?: string;
   name: string;
   image: string;
   price: number;

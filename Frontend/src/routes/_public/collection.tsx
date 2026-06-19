@@ -235,6 +235,7 @@ function CollectionRoute() {
     setCheckoutItems([
       {
         productId: "soliva-sunwrap",
+        variant: edition.id,
         name: `SunWrap by Soliva — ${edition.name}`,
         image: edition.images[0].src,
         price: 799,

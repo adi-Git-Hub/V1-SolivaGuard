@@ -27,6 +27,7 @@ export function MiniCartDrawer() {
     setCheckoutItems(
       lines.map((l) => ({
         productId: l.productId,
+        variant: l.variant,
         name: l.name,
         image: l.image,
         price: l.priceCents / 100,

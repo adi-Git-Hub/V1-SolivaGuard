@@ -401,11 +401,13 @@ function CheckoutRoute() {
     setErrors((prev) => ({ ...prev, [key]: validateField(key, form[key] as string) }));
   }
 
-  function updateQuantity(productId: string, delta: number) {
+  function updateQuantity(productId: string, variant: string | undefined, delta: number) {
     setItems(
       items
         .map((i) =>
-          i.productId === productId ? { ...i, quantity: Math.max(0, i.quantity + delta) } : i,
+          i.productId === productId && (i.variant ?? "") === (variant ?? "")
+            ? { ...i, quantity: Math.max(0, i.quantity + delta) }
+            : i,
         )
         .filter((i) => i.quantity > 0),
     );
@@ -1307,7 +1309,7 @@ function CheckoutRoute() {
 
                 <div className="space-y-5">
                   {items.map((item) => (
-                    <div key={item.productId} className="flex gap-4">
+                    <div key={`${item.productId}:${item.variant ?? ""}`} className="flex gap-4">
                       <div className="h-24 w-[76px] shrink-0 overflow-hidden rounded-2xl bg-gradient-to-br from-[#FBF6F0] via-[#F3ECE2] to-[#E7D8C4] border border-[#3a2a22]/[0.07] shadow-[0_8px_20px_-12px_rgba(58,42,34,0.35)]">
                         <img src={item.image} alt={item.name} className="h-full w-full object-cover" />
                       </div>
@@ -1321,7 +1323,7 @@ function CheckoutRoute() {
                         <div className="flex items-center justify-between">
                           <div className="inline-flex items-center gap-0 rounded-full border border-line-soft bg-white/60">
                             <button
-                              onClick={() => updateQuantity(item.productId, -1)}
+                              onClick={() => updateQuantity(item.productId, item.variant, -1)}
                               className="h-7 w-7 flex items-center justify-center text-ink-muted hover:text-brown-deep transition-colors"
                             >
                               <Minus className="h-3 w-3" />
@@ -1330,7 +1332,7 @@ function CheckoutRoute() {
                               {item.quantity}
                             </span>
                             <button
-                              onClick={() => updateQuantity(item.productId, 1)}
+                              onClick={() => updateQuantity(item.productId, item.variant, 1)}
                               className="h-7 w-7 flex items-center justify-center text-ink-muted hover:text-brown-deep transition-colors"
                             >
                               <Plus className="h-3 w-3" />
