@@ -187,10 +187,30 @@ class OrderService {
 
     logger.info(`[PAYMENT] Order ${orderId} marked as PAID & CONFIRMED`);
 
-    // ── Phase 2/7: auto-generate Tax Invoice + Payment Receipt and persist
-    // their permanent URLs on the order. Never blocks confirmation. ──
+    // Generate invoice/receipt PDFs + send the confirmation email in the
+    // BACKGROUND so this response returns immediately (~200ms). Previously the
+    // awaited PDF + email step blocked verify for 6-8s, leaving the user on a
+    // "Verifying payment…" loader and a stuck post-payment screen.
+    setImmediate(() => {
+      this.finalizePaidOrder(orderId).catch((e) =>
+        logger.error(`[ORDER] Async finalize failed for ${orderId}: ${e.message}`)
+      );
+    });
+
+    return true;
+  }
+
+  /**
+   * Post-payment side effects (documents + email). Runs out-of-band; failures
+   * are logged and never affect the payment-verification response.
+   */
+  async finalizePaidOrder(orderId) {
+    const order = await Order.findById(orderId);
+    if (!order) return;
+    const user = await User.findById(order.user).select('name email');
+
     try {
-      const docs = await generateOrderDocuments(order, await User.findById(order.user).select('name email'));
+      const docs = await generateOrderDocuments(order, user);
       if (docs.invoiceUrl) order.invoiceUrl = docs.invoiceUrl;
       if (docs.receiptUrl) order.receiptUrl = docs.receiptUrl;
       if (docs.invoiceNumber) order.invoiceNumber = docs.invoiceNumber;
@@ -202,9 +222,7 @@ class OrderService {
       logger.error(`[ORDER] Document generation skipped for ${orderId}: ${docErr.message}`);
     }
 
-    // ── Phase 6: order confirmation email with track / invoice / receipt links ──
     try {
-      const user = await User.findById(order.user).select('name email');
       if (user) {
         const html = getOrderConfirmationTemplate({
           customerName: order.shippingInfo?.fullName || user.name,
@@ -225,8 +243,6 @@ class OrderService {
     } catch (emailErr) {
       logger.warn(`[ORDER] Confirmation email skipped: ${emailErr.message}`);
     }
-
-    return true;
   }
 
   async getSingleOrder(id) {

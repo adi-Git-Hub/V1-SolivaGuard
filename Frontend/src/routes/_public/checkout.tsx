@@ -277,6 +277,17 @@ function CheckoutRoute() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.user?.id]);
 
+  // Redirect to the success page once payment is confirmed. Runs on the render
+  // AFTER paymentDone flips true, so formDirty is already false and the
+  // navigation blocker no longer cancels this navigate.
+  useEffect(() => {
+    if (paymentDone) {
+      navigate({ to: "/payment-success" });
+      clear();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paymentDone]);
+
   const upiInputRef = useRef<HTMLInputElement>(null);
 
   // Which fields are required given the current order type.
@@ -322,7 +333,7 @@ function CheckoutRoute() {
       (v) => v.trim() !== "",
     );
 
-  if (!items.length) {
+  if (!items.length && !paymentDone) {
     return (
       <div className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden px-4">
         <div className="fixed inset-0">
@@ -640,16 +651,18 @@ function CheckoutRoute() {
               razorpay_payment_id: response.razorpay_payment_id,
               razorpay_signature: response.razorpay_signature,
             });
-            setPaymentDone(true);
-            setStage("success");
             setConfirmedOrder({
               orderId,
               items: [...items],
               total,
               paymentId: response.razorpay_payment_id,
             });
-            clear();
-            navigate({ to: "/payment-success" });
+            setStage("success");
+            // Flip paymentDone — the redirect runs from an effect AFTER this
+            // re-render, by which point formDirty is false and the
+            // UnsavedChangesGuard blocker is inert (a synchronous navigate()
+            // here gets cancelled by the still-armed blocker → stuck loader).
+            setPaymentDone(true);
           } catch {
             handlePayFailure(
               new Error("Payment was charged but verification failed. Please contact support with your payment ID."),
