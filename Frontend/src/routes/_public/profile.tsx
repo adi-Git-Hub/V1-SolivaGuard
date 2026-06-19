@@ -13,7 +13,6 @@ import {
   ChevronRight,
   Bell,
   ShieldCheck,
-  Plus,
   Camera,
   Trash2,
   BadgeCheck,
@@ -31,6 +30,7 @@ import {
   Receipt,
 } from "lucide-react";
 import { OutdoorIntelligence } from "@/features/weather/OutdoorIntelligence";
+import { AddressesTab } from "@/features/user/components/AddressesTab";
 import { useSession } from "@/features/auth/hooks/useSession";
 import { useLogout } from "@/features/auth/api";
 import { useRemoveAvatar, useUpdateAvatar } from "@/features/user/api";
@@ -570,53 +570,8 @@ function ProfilePage() {
                   </div>
                 )}
 
-                {/* ════════ ADDRESSES — real data ════════ */}
-                {activeTab === "addresses" && (
-                  <div className="space-y-5 sm:space-y-6">
-                    <TabHeader eyebrow="Saved Addresses" title="Addresses" />
-                    {addressesQuery.isLoading ? (
-                      <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                        {[0, 1].map((i) => (
-                          <div key={i} className="h-40 rounded-panel bg-surface-panel border border-line-hairline animate-pulse" />
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                        {addresses.map((a) => (
-                          <div
-                            key={a._id}
-                            className="rounded-2xl sm:rounded-panel border border-line-hairline bg-surface-panel p-5 sm:p-6 backdrop-blur-medium shadow-sm transition-all duration-300 hover:shadow-md"
-                          >
-                            <div className="mb-3 flex items-start justify-between">
-                              <div className="h-9 w-9 rounded-xl bg-cream flex items-center justify-center">
-                                <MapPin className="h-4 w-4 text-ink-faint" />
-                              </div>
-                              {a.isDefault && (
-                                <span className="rounded-full bg-orange-glow/10 border border-orange-glow/20 px-2.5 py-0.5 font-mono text-[9px] tracking-widest uppercase font-bold text-orange-glow">
-                                  Default
-                                </span>
-                              )}
-                            </div>
-                            <h4 className="mb-1.5 font-mono text-[11px] tracking-widest text-brown-deep uppercase font-black">
-                              {a.label ?? "Address"}
-                            </h4>
-                            <p className="text-sm text-ink-soft leading-relaxed font-light break-words">
-                              {[a.street, a.city, a.state, a.pincode, a.country].filter(Boolean).join(", ")}
-                            </p>
-                          </div>
-                        ))}
-                        <button className="flex flex-col items-center justify-center gap-3 rounded-2xl sm:rounded-panel border border-dashed border-line-strong bg-surface-glass-ghost p-8 transition-all duration-300 group hover:bg-surface-panel hover:border-orange-glow/30">
-                          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-surface-panel-strong transition-transform duration-300 group-hover:scale-110">
-                            <Plus className="h-4 w-4 text-ink-faint" />
-                          </div>
-                          <span className="font-mono text-[11px] tracking-widest text-ink-muted uppercase font-bold">
-                            Add new address
-                          </span>
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )}
+                {/* ════════ ADDRESSES — fully functional via AddressesTab ════════ */}
+                {activeTab === "addresses" && <AddressesTab />}
 
                 {/* ════════ SETTINGS ════════ */}
                 {activeTab === "settings" && (
