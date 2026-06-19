@@ -30,11 +30,13 @@ import {
   ArrowUpRight,
   Truck,
   Headset,
+  FileText,
+  Receipt,
 } from "lucide-react";
 import { useSession } from "@/features/auth/hooks/useSession";
 import { useLogout } from "@/features/auth/api";
 import { useRemoveAvatar, useUpdateAvatar } from "@/features/user/api";
-import { useMyOrders } from "@/features/orders/api";
+import { useMyOrders, documentUrl } from "@/features/orders/api";
 import { useAddresses } from "@/features/user/profile-api";
 import { Avatar } from "@/components/shared/Avatar";
 import { Button } from "@/components/ui/button";
@@ -511,12 +513,41 @@ function ProfilePage() {
                                   {o.orderItems.reduce((n, it) => n + it.quantity, 0) === 1 ? "" : "s"}
                                 </p>
                               </div>
-                              <Button
-                                variant="outline"
-                                className="h-9 rounded-full px-4 text-[11px] tracking-widest uppercase border-line-strong text-ink-muted transition-all duration-300 hover:-translate-y-0.5 hover:text-brown-deep"
+                            </div>
+                            {/* Action row — Track / Digital Invoice / Digital Receipt.
+                                Desktop: one row; mobile: 3-up touch grid. */}
+                            <div className="mt-4 grid grid-cols-3 gap-2.5 sm:flex sm:flex-wrap">
+                              <Link
+                                to="/profile/orders/$id"
+                                params={{ id: (o._id ?? o.id) as string }}
+                                className="inline-flex h-10 items-center justify-center gap-1.5 rounded-full bg-brown-deep px-4 font-mono text-[10px] font-bold uppercase tracking-widest text-white active:scale-95"
                               >
-                                <Truck className="h-3.5 w-3.5 mr-1.5" /> Track
-                              </Button>
+                                <Truck className="h-3.5 w-3.5" /> Track Order
+                              </Link>
+                              {(() => {
+                                const inv = documentUrl(o.invoiceUrl);
+                                const rec = documentUrl(o.receiptUrl);
+                                return (
+                                  <>
+                                    <a
+                                      href={inv}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className={`inline-flex h-10 items-center justify-center gap-1.5 rounded-full border border-line-strong px-4 font-mono text-[10px] font-bold uppercase tracking-widest text-ink-muted transition-colors hover:text-brown-deep active:scale-95 ${!inv ? "pointer-events-none opacity-40" : ""}`}
+                                    >
+                                      <FileText className="h-3.5 w-3.5" /> Digital Invoice
+                                    </a>
+                                    <a
+                                      href={rec}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className={`inline-flex h-10 items-center justify-center gap-1.5 rounded-full border border-line-strong px-4 font-mono text-[10px] font-bold uppercase tracking-widest text-ink-muted transition-colors hover:text-brown-deep active:scale-95 ${!rec ? "pointer-events-none opacity-40" : ""}`}
+                                    >
+                                      <Receipt className="h-3.5 w-3.5" /> Digital Receipt
+                                    </a>
+                                  </>
+                                );
+                              })()}
                             </div>
                           </div>
                         ))}
