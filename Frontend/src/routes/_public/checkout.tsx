@@ -858,7 +858,7 @@ function CheckoutRoute() {
                 <SectionHeader
                   number="02"
                   title="Order Type"
-                  subtitle={orderType === "self" ? "Buying for myself" : "Buying as a gift"}
+                  subtitle={orderType === "self" ? "Buying for myself" : "Gifting to someone"}
                   expanded={expandedSection === 1}
                   onToggle={() => toggleSection(1)}
                   complete={orderType === "self" ? true : recipientValid}
