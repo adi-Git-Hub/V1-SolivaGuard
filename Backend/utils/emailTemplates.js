@@ -110,8 +110,16 @@ const getPasswordChangedTemplate = (name) => {
   `;
 };
 
-const getOrderConfirmationTemplate = ({ customerName, orderId, orderItems, totalPrice, shippingInfo }) => {
+const getOrderConfirmationTemplate = ({ customerName, orderId, orderItems, totalPrice, shippingInfo, trackUrl, invoiceUrl, receiptUrl }) => {
   const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:5173').split(',')[0].trim();
+  const ctaButtons = `
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:4px 0 30px;">
+      <tr><td align="center">
+        ${trackUrl ? `<a href="${trackUrl}" style="display:inline-block;margin:5px;padding:13px 26px;background:#3a2a22;color:#fff;text-decoration:none;border-radius:999px;font-family:'Helvetica Neue',sans-serif;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;">Track Your Order</a>` : ''}
+        ${invoiceUrl ? `<a href="${invoiceUrl}" style="display:inline-block;margin:5px;padding:13px 22px;background:#fff;color:#3a2a22;text-decoration:none;border:1px solid rgba(58,42,34,0.2);border-radius:999px;font-family:'Helvetica Neue',sans-serif;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;">View Invoice</a>` : ''}
+        ${receiptUrl ? `<a href="${receiptUrl}" style="display:inline-block;margin:5px;padding:13px 22px;background:#fff;color:#3a2a22;text-decoration:none;border:1px solid rgba(58,42,34,0.2);border-radius:999px;font-family:'Helvetica Neue',sans-serif;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;">View Receipt</a>` : ''}
+      </td></tr>
+    </table>`;
 
   const itemRows = (orderItems || []).map((item) => `
     <tr>
@@ -263,6 +271,9 @@ const getOrderConfirmationTemplate = ({ customerName, orderId, orderItems, total
 
               <!-- Divider -->
               <div style="height:1px;background:linear-gradient(90deg,transparent,rgba(58,42,34,0.08),transparent);margin:32px 0;"></div>
+
+              <!-- Track / Invoice / Receipt CTAs -->
+              ${ctaButtons}
 
               <!-- Why SOLIVA -->
               <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">

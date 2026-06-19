@@ -649,7 +649,7 @@ function CheckoutRoute() {
               paymentId: response.razorpay_payment_id,
             });
             clear();
-            navigate({ to: "/order-confirmed" });
+            navigate({ to: "/payment-success" });
           } catch {
             handlePayFailure(
               new Error("Payment was charged but verification failed. Please contact support with your payment ID."),

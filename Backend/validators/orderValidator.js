@@ -56,7 +56,7 @@ const orderValidator = {
 
   updateStatus: z.object({
     body: z.object({
-      status: z.enum(['pending', 'confirmed', 'paid', 'packed', 'shipped', 'delivered', 'cancelled', 'refunded']),
+      status: z.enum(['pending', 'confirmed', 'paid', 'packed', 'shipped', 'out_for_delivery', 'delivered', 'cancelled', 'refunded']),
     }),
     params: z.object({
       id: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid Order ID'),

@@ -50,17 +50,18 @@ const orderSchema = new mongoose.Schema(
     taxPrice: { type: Number, required: true, default: 0.0 },
     shippingPrice: { type: Number, required: true, default: 0.0 },
     totalPrice: { type: Number, required: true, default: 0.0 },
-    orderStatus: { 
-      type: String, 
-      required: true, 
-      enum: ['pending', 'confirmed', 'paid', 'packed', 'shipped', 'delivered', 'cancelled', 'refunded'],
-      default: 'pending' 
+    orderStatus: {
+      type: String,
+      required: true,
+      enum: ['pending', 'confirmed', 'paid', 'packed', 'shipped', 'out_for_delivery', 'delivered', 'cancelled', 'refunded'],
+      default: 'pending'
     },
     idempotencyKey: {
       type: String,
       unique: true,
       sparse: true,
     },
+    // Tracking timeline — events double as the immutable tracking history.
     events: [
       {
         status: { type: String, required: true },
@@ -69,6 +70,13 @@ const orderSchema = new mongoose.Schema(
       },
     ],
     deliveredAt: Date,
+
+    // ── Auto-generated documents (Phase 2/7) — permanent references. ──
+    invoiceNumber: { type: String },
+    receiptNumber: { type: String },
+    invoiceUrl: { type: String },
+    receiptUrl: { type: String },
+    documentsGeneratedAt: { type: Date },
   },
   { timestamps: true }
 );

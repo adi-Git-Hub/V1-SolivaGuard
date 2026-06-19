@@ -19,6 +19,7 @@ import { Route as PublicTechnologyRouteImport } from './routes/_public/technolog
 import { Route as PublicSupportRouteImport } from './routes/_public/support'
 import { Route as PublicStoryRouteImport } from './routes/_public/story'
 import { Route as PublicProfileRouteImport } from './routes/_public/profile'
+import { Route as PublicPaymentSuccessRouteImport } from './routes/_public/payment-success'
 import { Route as PublicOrderConfirmedRouteImport } from './routes/_public/order-confirmed'
 import { Route as PublicContactRouteImport } from './routes/_public/contact'
 import { Route as PublicCollectionRouteImport } from './routes/_public/collection'
@@ -29,6 +30,7 @@ import { Route as AuthRegisterRouteImport } from './routes/_auth/register'
 import { Route as AuthLoginRouteImport } from './routes/_auth/login'
 import { Route as AuthForgotPasswordRouteImport } from './routes/_auth/forgot-password'
 import { Route as PublicProductsSlugRouteImport } from './routes/_public/products/$slug'
+import { Route as PublicProfileOrdersIdRouteImport } from './routes/_public/profile.orders.$id'
 
 const AdminRouteRoute = AdminRouteRouteImport.update({
   id: '/admin',
@@ -76,6 +78,11 @@ const PublicStoryRoute = PublicStoryRouteImport.update({
 const PublicProfileRoute = PublicProfileRouteImport.update({
   id: '/profile',
   path: '/profile',
+  getParentRoute: () => PublicRouteRoute,
+} as any)
+const PublicPaymentSuccessRoute = PublicPaymentSuccessRouteImport.update({
+  id: '/payment-success',
+  path: '/payment-success',
   getParentRoute: () => PublicRouteRoute,
 } as any)
 const PublicOrderConfirmedRoute = PublicOrderConfirmedRouteImport.update({
@@ -128,6 +135,11 @@ const PublicProductsSlugRoute = PublicProductsSlugRouteImport.update({
   path: '/products/$slug',
   getParentRoute: () => PublicRouteRoute,
 } as any)
+const PublicProfileOrdersIdRoute = PublicProfileOrdersIdRouteImport.update({
+  id: '/orders/$id',
+  path: '/orders/$id',
+  getParentRoute: () => PublicProfileRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -141,13 +153,15 @@ export interface FileRoutesByFullPath {
   '/collection': typeof PublicCollectionRoute
   '/contact': typeof PublicContactRoute
   '/order-confirmed': typeof PublicOrderConfirmedRoute
-  '/profile': typeof PublicProfileRoute
+  '/payment-success': typeof PublicPaymentSuccessRoute
+  '/profile': typeof PublicProfileRouteWithChildren
   '/story': typeof PublicStoryRoute
   '/support': typeof PublicSupportRoute
   '/technology': typeof PublicTechnologyRoute
   '/terms': typeof PublicTermsRoute
   '/admin/dashboard': typeof AdminDashboardRoute
   '/products/$slug': typeof PublicProductsSlugRoute
+  '/profile/orders/$id': typeof PublicProfileOrdersIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -161,13 +175,15 @@ export interface FileRoutesByTo {
   '/collection': typeof PublicCollectionRoute
   '/contact': typeof PublicContactRoute
   '/order-confirmed': typeof PublicOrderConfirmedRoute
-  '/profile': typeof PublicProfileRoute
+  '/payment-success': typeof PublicPaymentSuccessRoute
+  '/profile': typeof PublicProfileRouteWithChildren
   '/story': typeof PublicStoryRoute
   '/support': typeof PublicSupportRoute
   '/technology': typeof PublicTechnologyRoute
   '/terms': typeof PublicTermsRoute
   '/admin/dashboard': typeof AdminDashboardRoute
   '/products/$slug': typeof PublicProductsSlugRoute
+  '/profile/orders/$id': typeof PublicProfileOrdersIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -184,13 +200,15 @@ export interface FileRoutesById {
   '/_public/collection': typeof PublicCollectionRoute
   '/_public/contact': typeof PublicContactRoute
   '/_public/order-confirmed': typeof PublicOrderConfirmedRoute
-  '/_public/profile': typeof PublicProfileRoute
+  '/_public/payment-success': typeof PublicPaymentSuccessRoute
+  '/_public/profile': typeof PublicProfileRouteWithChildren
   '/_public/story': typeof PublicStoryRoute
   '/_public/support': typeof PublicSupportRoute
   '/_public/technology': typeof PublicTechnologyRoute
   '/_public/terms': typeof PublicTermsRoute
   '/admin/dashboard': typeof AdminDashboardRoute
   '/_public/products/$slug': typeof PublicProductsSlugRoute
+  '/_public/profile/orders/$id': typeof PublicProfileOrdersIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -206,6 +224,7 @@ export interface FileRouteTypes {
     | '/collection'
     | '/contact'
     | '/order-confirmed'
+    | '/payment-success'
     | '/profile'
     | '/story'
     | '/support'
@@ -213,6 +232,7 @@ export interface FileRouteTypes {
     | '/terms'
     | '/admin/dashboard'
     | '/products/$slug'
+    | '/profile/orders/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -226,6 +246,7 @@ export interface FileRouteTypes {
     | '/collection'
     | '/contact'
     | '/order-confirmed'
+    | '/payment-success'
     | '/profile'
     | '/story'
     | '/support'
@@ -233,6 +254,7 @@ export interface FileRouteTypes {
     | '/terms'
     | '/admin/dashboard'
     | '/products/$slug'
+    | '/profile/orders/$id'
   id:
     | '__root__'
     | '/'
@@ -248,6 +270,7 @@ export interface FileRouteTypes {
     | '/_public/collection'
     | '/_public/contact'
     | '/_public/order-confirmed'
+    | '/_public/payment-success'
     | '/_public/profile'
     | '/_public/story'
     | '/_public/support'
@@ -255,6 +278,7 @@ export interface FileRouteTypes {
     | '/_public/terms'
     | '/admin/dashboard'
     | '/_public/products/$slug'
+    | '/_public/profile/orders/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -336,6 +360,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PublicProfileRouteImport
       parentRoute: typeof PublicRouteRoute
     }
+    '/_public/payment-success': {
+      id: '/_public/payment-success'
+      path: '/payment-success'
+      fullPath: '/payment-success'
+      preLoaderRoute: typeof PublicPaymentSuccessRouteImport
+      parentRoute: typeof PublicRouteRoute
+    }
     '/_public/order-confirmed': {
       id: '/_public/order-confirmed'
       path: '/order-confirmed'
@@ -406,6 +437,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PublicProductsSlugRouteImport
       parentRoute: typeof PublicRouteRoute
     }
+    '/_public/profile/orders/$id': {
+      id: '/_public/profile/orders/$id'
+      path: '/orders/$id'
+      fullPath: '/profile/orders/$id'
+      preLoaderRoute: typeof PublicProfileOrdersIdRouteImport
+      parentRoute: typeof PublicProfileRoute
+    }
   }
 }
 
@@ -427,13 +465,26 @@ const AuthRouteRouteWithChildren = AuthRouteRoute._addFileChildren(
   AuthRouteRouteChildren,
 )
 
+interface PublicProfileRouteChildren {
+  PublicProfileOrdersIdRoute: typeof PublicProfileOrdersIdRoute
+}
+
+const PublicProfileRouteChildren: PublicProfileRouteChildren = {
+  PublicProfileOrdersIdRoute: PublicProfileOrdersIdRoute,
+}
+
+const PublicProfileRouteWithChildren = PublicProfileRoute._addFileChildren(
+  PublicProfileRouteChildren,
+)
+
 interface PublicRouteRouteChildren {
   PublicCartRoute: typeof PublicCartRoute
   PublicCheckoutRoute: typeof PublicCheckoutRoute
   PublicCollectionRoute: typeof PublicCollectionRoute
   PublicContactRoute: typeof PublicContactRoute
   PublicOrderConfirmedRoute: typeof PublicOrderConfirmedRoute
-  PublicProfileRoute: typeof PublicProfileRoute
+  PublicPaymentSuccessRoute: typeof PublicPaymentSuccessRoute
+  PublicProfileRoute: typeof PublicProfileRouteWithChildren
   PublicStoryRoute: typeof PublicStoryRoute
   PublicSupportRoute: typeof PublicSupportRoute
   PublicTechnologyRoute: typeof PublicTechnologyRoute
@@ -447,7 +498,8 @@ const PublicRouteRouteChildren: PublicRouteRouteChildren = {
   PublicCollectionRoute: PublicCollectionRoute,
   PublicContactRoute: PublicContactRoute,
   PublicOrderConfirmedRoute: PublicOrderConfirmedRoute,
-  PublicProfileRoute: PublicProfileRoute,
+  PublicPaymentSuccessRoute: PublicPaymentSuccessRoute,
+  PublicProfileRoute: PublicProfileRouteWithChildren,
   PublicStoryRoute: PublicStoryRoute,
   PublicSupportRoute: PublicSupportRoute,
   PublicTechnologyRoute: PublicTechnologyRoute,

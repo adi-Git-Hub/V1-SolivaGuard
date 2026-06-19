@@ -46,11 +46,19 @@ export const orderStatusEnum = z.enum([
   "confirmed",
   "packed",
   "shipped",
+  "out_for_delivery",
   "delivered",
   "cancelled",
   "refunded",
 ]);
 export type OrderStatus = z.infer<typeof orderStatusEnum>;
+
+export const orderEventSchema = z.object({
+  status: z.string(),
+  message: z.string().optional(),
+  timestamp: z.string().optional(),
+});
+export type OrderEvent = z.infer<typeof orderEventSchema>;
 
 export const orderSchema = z.object({
   id: z.string(),
@@ -64,8 +72,15 @@ export const orderSchema = z.object({
   shippingPrice: z.number(),
   totalPrice: z.number(),
   orderStatus: orderStatusEnum,
+  events: z.array(orderEventSchema).optional().default([]),
   createdAt: z.string().optional(),
   deliveredAt: z.string().optional(),
+  // Auto-generated documents
+  invoiceNumber: z.string().optional(),
+  receiptNumber: z.string().optional(),
+  invoiceUrl: z.string().optional(),
+  receiptUrl: z.string().optional(),
+  documentsGeneratedAt: z.string().optional(),
 });
 export type Order = z.infer<typeof orderSchema>;
 

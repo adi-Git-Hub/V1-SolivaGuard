@@ -1,17 +1,40 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Package, ShoppingBag, Users, Wallet } from "lucide-react";
 
+import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { formatMoney } from "@/lib/format";
 import { useAdminStats } from "@/features/admin/api";
+import { useUpdateOrderStatus, documentUrl } from "@/features/orders/api";
 
 export const Route = createFileRoute("/admin/dashboard")({
   component: AdminDashboardRoute,
 });
 
+const ADMIN_STATUSES = [
+  "confirmed",
+  "packed",
+  "shipped",
+  "out_for_delivery",
+  "delivered",
+  "cancelled",
+];
+
 function AdminDashboardRoute() {
   const { data: stats, isLoading, isError, error } = useAdminStats();
+  const updateStatus = useUpdateOrderStatus();
+
+  const onStatusChange = (orderId: string, status: string) => {
+    updateStatus.mutate(
+      { orderId, status },
+      {
+        onSuccess: () => toast.success(`Order updated to ${status}`),
+        onError: (e: any) =>
+          toast.error(e?.message ?? "Could not update status (invalid transition)"),
+      },
+    );
+  };
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-12 sm:py-16 md:px-12 md:py-20 safe-x">
@@ -71,6 +94,7 @@ function AdminDashboardRoute() {
                       <th className="px-4 py-3 text-left">Ship To</th>
                       <th className="px-4 py-3 text-left">Payment</th>
                       <th className="px-4 py-3 text-left">Status</th>
+                      <th className="px-4 py-3 text-left">Docs</th>
                       <th className="px-4 py-3 text-right">Total</th>
                       <th className="px-4 py-3 text-right">Created</th>
                     </tr>
@@ -124,9 +148,43 @@ function AdminDashboardRoute() {
                           </span>
                         </td>
                         <td className="px-4 py-3">
-                          <span className="inline-flex rounded-full bg-accent/40 px-2 py-0.5 text-[11px] uppercase tracking-wider">
-                            {o.orderStatus}
-                          </span>
+                          {o.orderStatus === "cancelled" || o.orderStatus === "refunded" ? (
+                            <span className="inline-flex rounded-full bg-red-100 px-2 py-0.5 text-[11px] uppercase tracking-wider text-red-600">
+                              {o.orderStatus}
+                            </span>
+                          ) : (
+                            <select
+                              defaultValue={o.orderStatus}
+                              onChange={(e) => onStatusChange(o._id, e.target.value)}
+                              disabled={updateStatus.isPending}
+                              className="rounded-lg border border-border/60 bg-background px-2 py-1 text-[11px] uppercase tracking-wider"
+                            >
+                              <option value={o.orderStatus} disabled>
+                                {o.orderStatus}
+                              </option>
+                              {ADMIN_STATUSES.filter((st) => st !== o.orderStatus).map((st) => (
+                                <option key={st} value={st}>
+                                  {st.replace(/_/g, " ")}
+                                </option>
+                              ))}
+                            </select>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex flex-col gap-1 text-[11px]">
+                            {documentUrl(o.invoiceUrl) ? (
+                              <a href={documentUrl(o.invoiceUrl)} target="_blank" rel="noreferrer" className="text-orange-glow hover:underline">
+                                Invoice
+                              </a>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
+                            {documentUrl(o.receiptUrl) && (
+                              <a href={documentUrl(o.receiptUrl)} target="_blank" rel="noreferrer" className="text-orange-glow hover:underline">
+                                Receipt
+                              </a>
+                            )}
+                          </div>
                         </td>
                         <td className="px-4 py-3 text-right font-medium">
                           {formatMoney(Math.round(o.totalPrice * 100), "INR")}

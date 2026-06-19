@@ -9,7 +9,11 @@ const { enqueuePaymentRecovery } = require('../queues/paymentQueue');
 const { enqueueInventoryRecovery } = require('../queues/inventoryQueue');
 const { enqueueEmail } = require('../queues/emailQueue');
 const { getOrderConfirmationTemplate } = require('../utils/emailTemplates');
+const { generateOrderDocuments } = require('./pdfService');
 const User = require('../models/userModel');
+
+// Public origin used to build absolute document links in emails.
+const PUBLIC_URL = (process.env.PUBLIC_URL || 'https://solivaguard.com').replace(/\/$/, '');
 
 const isReplicaSet = async () => {
   try {
@@ -172,24 +176,45 @@ class OrderService {
       status: 'paid',
     };
 
-    if (order.orderStatus === 'pending') {
-      order.orderStatus = 'paid';
+    if (order.orderStatus === 'pending' || order.orderStatus === 'paid') {
+      // Payment done → start the fulfilment timeline at "Order Confirmed".
+      order.orderStatus = 'confirmed';
       order.events.push({ status: 'paid', message: 'Payment verified successfully via Razorpay' });
+      order.events.push({ status: 'confirmed', message: 'Order confirmed — preparing for processing' });
     }
 
     await order.save();
 
-    logger.info(`[PAYMENT] Order ${orderId} marked as PAID`);
+    logger.info(`[PAYMENT] Order ${orderId} marked as PAID & CONFIRMED`);
 
+    // ── Phase 2/7: auto-generate Tax Invoice + Payment Receipt and persist
+    // their permanent URLs on the order. Never blocks confirmation. ──
+    try {
+      const docs = await generateOrderDocuments(order, await User.findById(order.user).select('name email'));
+      if (docs.invoiceUrl) order.invoiceUrl = docs.invoiceUrl;
+      if (docs.receiptUrl) order.receiptUrl = docs.receiptUrl;
+      if (docs.invoiceNumber) order.invoiceNumber = docs.invoiceNumber;
+      if (docs.receiptNumber) order.receiptNumber = docs.receiptNumber;
+      order.documentsGeneratedAt = new Date();
+      await order.save();
+      logger.info(`[ORDER] Documents generated for ${orderId}: ${order.invoiceNumber}, ${order.receiptNumber}`);
+    } catch (docErr) {
+      logger.error(`[ORDER] Document generation skipped for ${orderId}: ${docErr.message}`);
+    }
+
+    // ── Phase 6: order confirmation email with track / invoice / receipt links ──
     try {
       const user = await User.findById(order.user).select('name email');
       if (user) {
         const html = getOrderConfirmationTemplate({
-          customerName: user.name,
+          customerName: order.shippingInfo?.fullName || user.name,
           orderId: order._id,
           orderItems: order.orderItems,
           totalPrice: order.totalPrice,
           shippingInfo: order.shippingInfo,
+          trackUrl: `${PUBLIC_URL}/profile/orders/${order._id}`,
+          invoiceUrl: order.invoiceUrl ? `${PUBLIC_URL}${order.invoiceUrl}` : null,
+          receiptUrl: order.receiptUrl ? `${PUBLIC_URL}${order.receiptUrl}` : null,
         });
         await enqueueEmail('orderConfirmation', {
           email: user.email,
@@ -265,7 +290,8 @@ class OrderService {
       'paid': ['confirmed', 'packed', 'cancelled', 'refunded'],
       'confirmed': ['packed', 'shipped', 'cancelled', 'refunded'],
       'packed': ['shipped', 'cancelled', 'refunded'],
-      'shipped': ['delivered', 'cancelled', 'refunded'],
+      'shipped': ['out_for_delivery', 'delivered', 'cancelled', 'refunded'],
+      'out_for_delivery': ['delivered', 'cancelled', 'refunded'],
       'delivered': ['refunded'],
       'cancelled': [],
       'refunded': [],

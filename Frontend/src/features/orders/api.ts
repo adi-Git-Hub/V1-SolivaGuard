@@ -6,7 +6,17 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api } from "@/lib/api";
+import { env } from "@/config/env";
 import type { CreateOrderInput, Order } from "./schema";
+
+// Documents (invoice/receipt) are served by the backend at /uploads/... — i.e.
+// the API origin WITHOUT the /api/v1 suffix. Build an absolute, downloadable URL.
+export function documentUrl(path?: string): string | undefined {
+  if (!path) return undefined;
+  if (path.startsWith("http")) return path;
+  const origin = (env.VITE_API_URL || "").replace(/\/api\/v1\/?$/, "");
+  return `${origin}${path}`;
+}
 
 type EnvelopedResponse<T> = { success: boolean; message?: string; data: T };
 
@@ -91,6 +101,20 @@ export function useCancelOrder() {
     onSuccess: (_data, orderId) => {
       qc.invalidateQueries({ queryKey: orderKeys.byId(orderId) });
       qc.invalidateQueries({ queryKey: orderKeys.mine() });
+    },
+  });
+}
+
+// ── Admin: update fulfilment status ──
+export function useUpdateOrderStatus() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ orderId, status }: { orderId: string; status: string }) =>
+      api.put<EnvelopedResponse<{ order: Order }>>(`/orders/admin/orders/${orderId}`, { status }),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: orderKeys.byId(vars.orderId) });
+      qc.invalidateQueries({ queryKey: orderKeys.mine() });
+      qc.invalidateQueries({ queryKey: ["admin"] });
     },
   });
 }

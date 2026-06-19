@@ -10,6 +10,9 @@ type RecentOrder = {
   createdAt: string;
   user?: { name?: string; email?: string } | null;
   paymentInfo?: { status?: string } | null;
+  invoiceUrl?: string;
+  receiptUrl?: string;
+  invoiceNumber?: string;
   shippingInfo?: {
     fullName?: string;
     phone?: string;
