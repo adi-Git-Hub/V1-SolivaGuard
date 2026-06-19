@@ -97,6 +97,8 @@ function ProfilePage() {
   const avatarFileInput = useRef<HTMLInputElement>(null);
   const updateAvatar = useUpdateAvatar();
   const removeAvatar = useRemoveAvatar();
+  // Local object-URL preview — shows the picked image instantly before the upload completes.
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
 
   async function onAvatarPicked(file: File | undefined) {
     if (!file) return;
@@ -108,11 +110,19 @@ function ProfilePage() {
       toast.error("Image must be 10 MB or smaller");
       return;
     }
+    // Show preview immediately — no waiting for the upload.
+    const objectUrl = URL.createObjectURL(file);
+    setAvatarPreview(objectUrl);
     try {
       await updateAvatar.mutateAsync(file);
       toast.success("Profile photo updated");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not update photo");
+      // Revert preview on failure.
+      setAvatarPreview(null);
+    } finally {
+      URL.revokeObjectURL(objectUrl);
+      setAvatarPreview(null);
     }
   }
 
@@ -183,7 +193,7 @@ function ProfilePage() {
                 />
                 <div className="relative rounded-full ring-2 ring-orange-glow/15 ring-offset-2 ring-offset-surface-panel transition-all duration-500 group-hover:ring-orange-glow/40">
                   <Avatar
-                    src={user.avatarUrl}
+                    src={avatarPreview ?? user.avatarUrl}
                     name={user.name}
                     size={84}
                     className="shadow-inner transition-all duration-500 group-hover:shadow-lg"
@@ -284,7 +294,7 @@ function ProfilePage() {
                       <div className="px-5 sm:px-8 pb-6 -mt-10">
                         <div className="flex flex-col sm:flex-row sm:items-end gap-4">
                           <div className="rounded-full ring-4 ring-surface-panel">
-                            <Avatar src={user.avatarUrl} name={user.name} size={72} className="shadow-md" />
+                            <Avatar src={avatarPreview ?? user.avatarUrl} name={user.name} size={72} className="shadow-md" />
                           </div>
                           <div className="flex-1 min-w-0 sm:pb-1">
                             <h1 className="font-display text-[1.75rem] sm:text-[2rem] leading-tight tracking-tight text-brown-deep">

@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { MapPin, Plus, Star } from "lucide-react";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
 import {
   useAddresses,
   useAddAddress,
@@ -78,13 +77,13 @@ export function AddressesTab() {
             Saved Addresses
           </h1>
         </div>
-        <Button
+        <button
           onClick={openAdd}
-          className="rounded-full bg-brown-deep text-white h-12 px-8 font-mono text-micro-sm uppercase tracking-widest shadow-lg hover:shadow-xl transition-all"
+          className="inline-flex items-center justify-center gap-2 rounded-full bg-brown-deep text-white h-12 px-8 font-mono text-micro-sm uppercase tracking-widest shadow-lg transition-all duration-200 hover:bg-[#2a1e17] hover:shadow-xl hover:scale-[1.02] active:scale-[0.98]"
         >
-          <Plus className="h-4 w-4 mr-2" />
+          <Plus className="h-4 w-4" />
           Add Address
-        </Button>
+        </button>
       </header>
 
       {list.length === 0 ? (
@@ -94,13 +93,13 @@ export function AddressesTab() {
           <p className="mb-6 text-sm text-ink-muted">
             Add a delivery address so checkout is one tap away.
           </p>
-          <Button
+          <button
             onClick={openAdd}
-            className="rounded-full bg-brown-deep text-white px-7 font-mono text-micro-sm uppercase tracking-widest"
+            className="inline-flex items-center justify-center gap-2 rounded-full bg-brown-deep text-white px-7 h-11 font-mono text-micro-sm uppercase tracking-widest transition-all duration-200 hover:bg-[#2a1e17] hover:scale-[1.02] active:scale-[0.98]"
           >
-            <Plus className="h-4 w-4 mr-2" />
+            <Plus className="h-4 w-4" />
             Add your first address
-          </Button>
+          </button>
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
@@ -151,33 +150,30 @@ export function AddressesTab() {
 
               <div className="flex flex-wrap gap-2 pt-6 border-t border-line-soft">
                 {!addr.isDefault && (
-                  <Button
-                    variant="ghost"
+                  <button
                     onClick={() => setDefault.mutate(aid(addr))}
                     disabled={setDefault.isPending}
-                    className="flex-1 min-w-[90px] text-orange-glow hover:text-orange-glow h-10 font-mono text-micro-xs tracking-widest uppercase rounded-xl border border-transparent hover:border-orange-glow/30 transition-all"
+                    className="flex flex-1 min-w-[90px] items-center justify-center gap-1.5 h-10 rounded-xl border border-transparent font-mono text-micro-xs tracking-widest uppercase text-orange-glow transition-all duration-200 hover:bg-orange-glow/10 hover:border-orange-glow/30 disabled:opacity-40"
                   >
-                    <Star className="h-3.5 w-3.5 mr-1.5" />
+                    <Star className="h-3.5 w-3.5" />
                     Default
-                  </Button>
+                  </button>
                 )}
-                <Button
-                  variant="ghost"
+                <button
                   onClick={() => openEdit(addr)}
-                  className="flex-1 min-w-[80px] text-ink-muted hover:text-brown-deep h-10 font-mono text-micro-xs tracking-widest uppercase rounded-xl border border-transparent hover:border-line-soft transition-all"
+                  className="flex flex-1 min-w-[80px] items-center justify-center h-10 rounded-xl border border-transparent font-mono text-micro-xs tracking-widest uppercase text-ink-muted transition-all duration-200 hover:bg-surface-panel-strong hover:border-line-soft hover:text-brown-deep"
                 >
                   Edit
-                </Button>
-                <Button
-                  variant="ghost"
+                </button>
+                <button
                   onClick={() => {
                     if (confirm("Delete this address?")) deleteAddress.mutate(aid(addr));
                   }}
                   disabled={deleteAddress.isPending}
-                  className="flex-1 min-w-[80px] text-red-500/60 hover:text-red-500 h-10 font-mono text-micro-xs tracking-widest uppercase rounded-xl border border-transparent hover:border-red-100 transition-all"
+                  className="flex flex-1 min-w-[80px] items-center justify-center h-10 rounded-xl border border-transparent font-mono text-micro-xs tracking-widest uppercase text-red-400 transition-all duration-200 hover:bg-red-50 hover:border-red-100 hover:text-red-600 disabled:opacity-40"
                 >
                   Delete
-                </Button>
+                </button>
               </div>
             </div>
           ))}

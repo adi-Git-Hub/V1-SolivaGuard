@@ -46,8 +46,14 @@ export function useUpdateAvatar() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (file: File) => postAvatar(file),
-    // Refresh the session so navbar + profile pick up the new URL.
-    onSuccess: () => qc.invalidateQueries({ queryKey: sessionQueryKey }),
+    onSuccess: (data) => {
+      // Patch the session cache immediately so Avatar re-renders without a refetch.
+      qc.setQueryData(sessionQueryKey, (old: any) =>
+        old ? { ...old, user: { ...old.user, avatarUrl: data.avatarUrl } } : old,
+      );
+      // Background refetch so any other session fields stay fresh.
+      qc.invalidateQueries({ queryKey: sessionQueryKey });
+    },
   });
 }
 
