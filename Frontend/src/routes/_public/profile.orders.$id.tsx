@@ -77,6 +77,8 @@ function OrderDetailsRoute() {
   const ship = order.shippingInfo;
   const invoiceHref = documentUrl(order.invoiceUrl);
   const receiptHref = documentUrl(order.receiptUrl);
+  // user is populated to { name, email } by the backend on single-order fetch.
+  const customerEmail = typeof order.user === "object" ? (order.user as any)?.email : undefined;
 
   return (
     <div className="min-h-screen w-full bg-[#FAF7F3] text-brown-deep safe-x pb-24">
@@ -116,7 +118,7 @@ function OrderDetailsRoute() {
             rel="noreferrer"
             className={`inline-flex items-center gap-2 rounded-full border border-brown-deep/20 bg-white px-5 py-2.5 font-mono text-[11px] font-bold uppercase tracking-[0.16em] transition-colors hover:border-brown-deep/40 ${!invoiceHref ? "pointer-events-none opacity-40" : ""}`}
           >
-            <FileText className="h-4 w-4" /> Download Invoice
+            <FileText className="h-4 w-4" /> Digital Invoice
           </a>
           <a
             href={receiptHref}
@@ -124,7 +126,7 @@ function OrderDetailsRoute() {
             rel="noreferrer"
             className={`inline-flex items-center gap-2 rounded-full border border-brown-deep/20 bg-white px-5 py-2.5 font-mono text-[11px] font-bold uppercase tracking-[0.16em] transition-colors hover:border-brown-deep/40 ${!receiptHref ? "pointer-events-none opacity-40" : ""}`}
           >
-            <Receipt className="h-4 w-4" /> Download Receipt
+            <Receipt className="h-4 w-4" /> Digital Receipt
           </a>
         </div>
 
@@ -187,41 +189,71 @@ function OrderDetailsRoute() {
           </Card>
 
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-            <Card title="Shipping Address" icon={MapPin}>
+            <Card title="Customer & Shipping" icon={MapPin}>
               {ship ? (
                 <p className="text-[13px] leading-relaxed text-brown-deep/80">
                   <span className="font-semibold text-brown-deep">{ship.fullName}</span>
                   <br />
-                  {[ship.houseNo, ship.buildingName, ship.street, ship.landmark].filter(Boolean).join(", ")}
-                  <br />
-                  {ship.city}, {ship.state} {ship.pincode}
-                  <br />
-                  {ship.country}
-                  <br />
                   <span className="text-ink-muted">{ship.phone}</span>
+                  {customerEmail && (
+                    <>
+                      <br />
+                      <span className="text-ink-muted">{customerEmail}</span>
+                    </>
+                  )}
+                  <br />
+                  <span className="mt-2 block">
+                    {[ship.houseNo, ship.buildingName, ship.street, ship.landmark].filter(Boolean).join(", ")}
+                    <br />
+                    {ship.city}, {ship.state} {ship.pincode}
+                    <br />
+                    {ship.country}
+                  </span>
                 </p>
               ) : (
                 <p className="text-[13px] text-ink-muted">—</p>
               )}
             </Card>
 
-            <Card title="Payment" icon={CreditCard}>
-              <p className="text-[13px] text-brown-deep/80">Method: Razorpay</p>
-              <p className="mt-1 text-[13px] text-brown-deep/80">
-                Status:{" "}
-                <span className="font-semibold text-emerald-600">
-                  {(order.paymentInfo?.status ?? "paid").toUpperCase()}
-                </span>
-              </p>
-              {order.paymentInfo?.razorpay_payment_id && (
-                <p className="mt-1 break-all font-mono text-[11px] text-ink-muted">
-                  {order.paymentInfo.razorpay_payment_id}
-                </p>
-              )}
+            <Card title="Payment Information" icon={CreditCard}>
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[13px] text-ink-muted">Status</span>
+                  <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-emerald-600">
+                    {(order.paymentInfo?.status ?? "paid").toUpperCase()}
+                  </span>
+                </div>
+                <PayRow k="Method" v="Razorpay" />
+                {order.paymentInfo?.razorpay_payment_id && (
+                  <PayRow k="Transaction ID" v={order.paymentInfo.razorpay_payment_id} mono />
+                )}
+                {order.invoiceNumber && <PayRow k="Invoice No." v={order.invoiceNumber} mono />}
+                {order.receiptNumber && <PayRow k="Receipt No." v={order.receiptNumber} mono />}
+              </div>
             </Card>
+          </div>
+
+          {/* Customer message */}
+          <div className="rounded-3xl border border-orange-glow/15 bg-gradient-to-br from-[#FBF3E7] to-[#F8ECDC] p-7 text-center shadow-[0_24px_60px_-44px_rgba(199,102,0,0.5)]">
+            <p className="font-display text-xl text-brown-deep">Thank you for choosing Soliva.</p>
+            <p className="mx-auto mt-2 max-w-md text-[13px] leading-relaxed text-brown-deep/70">
+              Your invoice and payment receipt are securely stored and available anytime inside your
+              account.
+            </p>
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function PayRow({ k, v, mono }: { k: string; v: string; mono?: boolean }) {
+  return (
+    <div className="flex items-start justify-between gap-3">
+      <span className="shrink-0 text-[13px] text-ink-muted">{k}</span>
+      <span className={`text-right text-[13px] text-brown-deep ${mono ? "break-all font-mono text-[11px]" : ""}`}>
+        {v}
+      </span>
     </div>
   );
 }

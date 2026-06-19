@@ -146,7 +146,7 @@ export function OrdersTab() {
                     rel="noreferrer"
                     className={`inline-flex h-10 items-center justify-center gap-1.5 rounded-full border border-line-strong px-4 font-mono text-[10px] font-bold uppercase tracking-widest text-ink-muted hover:text-brown-deep active:scale-95 ${!invoiceHref ? "pointer-events-none opacity-40" : ""}`}
                   >
-                    <FileText className="h-3.5 w-3.5" /> Invoice
+                    <FileText className="h-3.5 w-3.5" /> Digital Invoice
                   </a>
                   <a
                     href={receiptHref}
@@ -154,7 +154,7 @@ export function OrdersTab() {
                     rel="noreferrer"
                     className={`inline-flex h-10 items-center justify-center gap-1.5 rounded-full border border-line-strong px-4 font-mono text-[10px] font-bold uppercase tracking-widest text-ink-muted hover:text-brown-deep active:scale-95 ${!receiptHref ? "pointer-events-none opacity-40" : ""}`}
                   >
-                    <Receipt className="h-3.5 w-3.5" /> Receipt
+                    <Receipt className="h-3.5 w-3.5" /> Digital Receipt
                   </a>
                 </div>
               </div>

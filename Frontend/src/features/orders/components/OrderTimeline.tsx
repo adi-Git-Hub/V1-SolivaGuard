@@ -3,12 +3,12 @@ import type { Order, OrderStatus } from "@/features/orders/schema";
 
 /* Canonical 6-step fulfilment timeline. The backend orderStatus maps onto it. */
 const STEPS = [
-  { key: "confirmed", label: "Order Confirmed", icon: BadgeCheck },
-  { key: "processing", label: "Processing", icon: ClipboardList },
-  { key: "packed", label: "Packed", icon: Package },
-  { key: "shipped", label: "Shipped", icon: Truck },
-  { key: "out_for_delivery", label: "Out for Delivery", icon: Truck },
-  { key: "delivered", label: "Delivered", icon: Home },
+  { key: "confirmed", label: "Order Confirmed", icon: BadgeCheck, desc: "We've received your order and payment is confirmed." },
+  { key: "processing", label: "Processing", icon: ClipboardList, desc: "Your order is being prepared at our facility." },
+  { key: "packed", label: "Packed", icon: Package, desc: "Your order has been packed and prepared for dispatch." },
+  { key: "shipped", label: "Shipped", icon: Truck, desc: "Your order is on its way with our delivery partner." },
+  { key: "out_for_delivery", label: "Out for Delivery", icon: Truck, desc: "Your order is out for delivery and arriving soon." },
+  { key: "delivered", label: "Delivered", icon: Home, desc: "Your order has been delivered. Enjoy your Soliva." },
 ] as const;
 
 // orderStatus → index of the CURRENT (active) step.
@@ -114,11 +114,18 @@ export function OrderTimeline({ order }: { order: Order }) {
                 {step.label}
               </p>
               {(complete || active) && tsFor(step.key) && (
-                <p className="mt-0.5 text-[11px] text-ink-muted">{tsFor(step.key)}</p>
+                <p className="mt-0.5 font-mono text-[10px] text-ink-muted">{tsFor(step.key)}</p>
               )}
               {active && !tsFor(step.key) && (
-                <p className="mt-0.5 text-[11px] text-orange-glow">In progress…</p>
+                <p className="mt-0.5 font-mono text-[10px] text-orange-glow">In progress…</p>
               )}
+              <p
+                className={`mt-1 max-w-[34ch] text-[12px] leading-snug ${
+                  complete || active ? "text-brown-deep/65" : "text-ink-muted/40"
+                }`}
+              >
+                {step.desc}
+              </p>
             </div>
           </li>
         );
