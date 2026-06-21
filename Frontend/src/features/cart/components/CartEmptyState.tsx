@@ -2,8 +2,10 @@ import { motion } from "framer-motion";
 import { ShoppingBag, ArrowRight, Sparkles, Star, ScrollText, Plus } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
+import { useCartUIStore } from "@/features/cart/store";
 
 export function CartEmptyState() {
+  const closeCart = useCartUIStore((s) => s.closeCart);
   return (
     <div className="relative min-h-[70vh] flex flex-col items-center justify-center overflow-hidden py-12 px-4">
       {/* Cinematic Background Glows */}
@@ -87,7 +89,7 @@ export function CartEmptyState() {
               size="lg"
               className="rounded-full px-10 py-7 text-lg group bg-foreground text-background hover:bg-foreground/90 transition-all duration-500 hover:scale-[1.02] shadow-xl shadow-black/10"
             >
-              <Link to="/collection">
+              <Link to="/collection" onClick={closeCart}>
                 Explore the Collection
                 <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </Link>
@@ -110,6 +112,7 @@ export function CartEmptyState() {
               >
                 <Link
                   to={item.to as any}
+                  onClick={closeCart}
                   className="group flex flex-col items-center gap-3 p-4 rounded-2xl hover:bg-white/5 transition-all duration-300"
                 >
                   <div className="w-10 h-10 rounded-full flex items-center justify-center bg-white/5 group-hover:bg-bronze/10 group-hover:scale-110 transition-all duration-500">

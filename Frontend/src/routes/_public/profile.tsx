@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -40,7 +40,6 @@ import { Avatar } from "@/components/shared/Avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
-import { ProductCard } from "@/features/catalog/components/ProductCard";
 import { useProducts } from "@/features/catalog/api";
 
 export const Route = createFileRoute("/_public/profile")({
@@ -77,6 +76,17 @@ function ProfilePage() {
   const navigate = useNavigate();
   const logout = useLogout();
   const [activeTab, setActiveTab] = useState<Tab>("overview");
+  const contentRef = useRef<HTMLElement>(null);
+
+  const switchTab = useCallback((tab: Tab) => {
+    setActiveTab(tab);
+    // On mobile, scroll the content panel into view after state updates.
+    if (window.innerWidth < 768) {
+      setTimeout(() => {
+        contentRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 80);
+    }
+  }, []);
 
   const { data: products = [] } = useProducts({ page: 1, limit: 4, sort: "newest" });
   const ordersQuery = useMyOrders();
@@ -239,7 +249,7 @@ function ProfilePage() {
               {sidebarLinks.map((link) => (
                 <button
                   key={link.id}
-                  onClick={() => setActiveTab(link.id)}
+                  onClick={() => switchTab(link.id)}
                   className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 group ${
                     activeTab === link.id
                       ? "bg-surface-glass-strong text-brown-deep shadow-sm border border-line-hairline"
@@ -275,7 +285,7 @@ function ProfilePage() {
           </motion.aside>
 
           {/* RIGHT CONTENT */}
-          <main className="flex-1 w-full min-h-[600px]">
+          <main ref={contentRef} className="flex-1 w-full min-h-[600px]">
             <AnimatePresence mode="wait">
               <motion.div
                 key={activeTab}
@@ -313,7 +323,7 @@ function ProfilePage() {
                               Member Since {safeDate(user.createdAt, "MMM yyyy")}
                             </span>
                             <Button
-                              onClick={() => setActiveTab("settings")}
+                              onClick={() => switchTab("settings")}
                               className="h-9 rounded-full bg-brown-deep px-4 text-[11px] tracking-widest uppercase font-bold text-white shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:bg-brown hover:shadow-md"
                             >
                               <Pencil className="h-3.5 w-3.5 mr-1.5" /> Edit Profile
@@ -328,7 +338,7 @@ function ProfilePage() {
                       {stats.map((s) => (
                         <button
                           key={s.label}
-                          onClick={() => setActiveTab(s.id)}
+                          onClick={() => switchTab(s.id)}
                           className="group text-left rounded-2xl border border-line-hairline bg-surface-panel p-4 backdrop-blur-medium shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md hover:border-orange-glow/30"
                         >
                           <s.icon className="h-4 w-4 text-orange-glow/70 mb-2.5 transition-transform duration-300 group-hover:scale-110" />
@@ -401,7 +411,7 @@ function ProfilePage() {
                           </SectionTitle>
                           {orders.length > 0 && (
                             <button
-                              onClick={() => setActiveTab("orders")}
+                              onClick={() => switchTab("orders")}
                               className="group inline-flex items-center gap-1 font-mono text-[10px] tracking-widest uppercase font-bold text-orange-glow"
                             >
                               View all
@@ -542,41 +552,44 @@ function ProfilePage() {
                   </div>
                 )}
 
-                {/* ════════ WISHLIST ════════ */}
+                {/* ════════ WISHLIST — Coming Soon ════════ */}
                 {activeTab === "wishlist" && (
                   <div className="space-y-5 sm:space-y-6">
                     <TabHeader eyebrow="Saved Selections" title="Your wishlist" />
-                    {products.length > 0 ? (
-                      <div className="grid grid-cols-1 gap-5 sm:gap-6 sm:grid-cols-2">
-                        {products.map((p) => (
-                          <div
-                            key={p.id}
-                            className="rounded-2xl sm:rounded-panel border border-line-hairline bg-surface-panel p-4 sm:p-5 backdrop-blur-medium transition-all duration-300 hover:shadow-md"
-                          >
-                            <ProductCard product={p} />
-                            <div className="mt-3 pt-3 border-t border-line-soft flex items-center justify-between gap-3">
-                              <Button
-                                variant="ghost"
-                                className="text-red-500/60 hover:text-red-500 p-0 h-auto font-mono text-[10px] tracking-widest uppercase"
-                              >
-                                Remove
-                              </Button>
-                              <Button className="h-9 rounded-full bg-brown-deep px-4 text-[11px] tracking-widest uppercase text-white transition-all duration-300 hover:-translate-y-0.5">
-                                Move to cart
-                              </Button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <EmptyState
-                        icon={Heart}
-                        title="Nothing saved yet"
-                        body="Browse our collections to find your favourite editions."
-                        cta={{ label: "Explore collection", to: "/collection" }}
-                        large
-                      />
-                    )}
+                    <div className="rounded-2xl sm:rounded-panel border border-line-hairline bg-surface-panel p-10 sm:p-16 backdrop-blur-medium shadow-sm text-center">
+                      <motion.div
+                        initial={{ scale: 0.85, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+                        className="mb-6 inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-orange-glow/10 text-orange-glow"
+                      >
+                        <Heart className="h-8 w-8" strokeWidth={1.5} />
+                      </motion.div>
+                      <motion.h3
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.15, duration: 0.5 }}
+                        className="font-display text-2xl sm:text-3xl text-brown-deep tracking-tight mb-3"
+                      >
+                        Coming Soon
+                      </motion.h3>
+                      <motion.p
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.25, duration: 0.5 }}
+                        className="text-sm font-light text-ink-muted max-w-xs mx-auto leading-relaxed"
+                      >
+                        Save your favourite Soliva pieces in one place. We're building something beautiful for you.
+                      </motion.p>
+                      <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ delay: 0.4 }}
+                        className="mt-6 inline-flex items-center gap-2 rounded-full border border-orange-glow/20 bg-orange-glow/[0.06] px-4 py-2 font-mono text-[10px] tracking-widest uppercase font-bold text-orange-glow"
+                      >
+                        <Sparkles className="h-3 w-3" /> Launching soon
+                      </motion.div>
+                    </div>
                   </div>
                 )}
 

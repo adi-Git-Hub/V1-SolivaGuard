@@ -1056,8 +1056,6 @@ function CheckoutRoute() {
                           </div>
                         )}
 
-                        {addressMode === "new" && (
-                        <div className="space-y-5">
                         <motion.button
                           whileHover={{ scale: 1.01 }}
                           whileTap={{ scale: 0.98 }}
@@ -1078,6 +1076,8 @@ function CheckoutRoute() {
                           )}
                         </motion.button>
 
+                        {addressMode === "new" && (
+                        <div className="space-y-5">
                         <LuxField
                           name="address"
                           label="Address"
@@ -1753,7 +1753,7 @@ function LuxField({
   onEdit?: () => void;
 }) {
   const [focused, setFocused] = useState(false);
-  const active = focused || !!value;
+  const active = focused || !!value || hasError;
   const hasError = !!error;
   const showSuccess = !hasError && !!value && !locked;
 
