@@ -12,7 +12,7 @@ import { useSession } from "@/features/auth/hooks/useSession";
 import { useCheckoutStore } from "@/features/checkout/store";
 import { viewportOnce } from "@/design-system";
 import { TermsAndConditions } from "@/components/TermsAndConditions";
-import { useFlyToCart } from "@/features/cart/components/FlyToCart";
+import { useFlyToCart, FlyToCartProvider } from "@/features/cart/components/FlyToCart";
 
 export const Route = createFileRoute("/_public/products/$slug")({
   component: ProductRoute,
@@ -159,8 +159,11 @@ function ProductRoute() {
   const { slug } = Route.useParams();
   const solivaProduct = findSolivaProduct(slug);
 
-  if (solivaProduct) return <SolivaProductDetail product={solivaProduct} />;
-  return <ApiProductDetail slug={slug} />;
+  return (
+    <FlyToCartProvider>
+      {solivaProduct ? <SolivaProductDetail product={solivaProduct} /> : <ApiProductDetail slug={slug} />}
+    </FlyToCartProvider>
+  );
 }
 
 // --- NEW COMPONENT: Premium Add To Cart Button ---
