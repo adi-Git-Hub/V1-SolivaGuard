@@ -1753,8 +1753,8 @@ function LuxField({
   onEdit?: () => void;
 }) {
   const [focused, setFocused] = useState(false);
-  const active = focused || !!value || hasError;
   const hasError = !!error;
+  const active = focused || !!value || hasError;
   const showSuccess = !hasError && !!value && !locked;
 
   return (
