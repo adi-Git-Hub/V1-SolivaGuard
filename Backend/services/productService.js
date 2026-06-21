@@ -91,6 +91,8 @@ class ProductService {
 
   async createProduct(data, userId) {
     data.user = userId;
+    if (data.price != null)          data.price          = Math.round(data.price);
+    if (data.compareAtPrice != null) data.compareAtPrice = Math.round(data.compareAtPrice);
     const product = await Product.create(data);
     logger.info(`[ADMIN] Product Created: ${product.name} (ID: ${product._id}) by Admin: ${userId}`);
     return product;
@@ -101,6 +103,9 @@ class ProductService {
     if (!product) {
       throw new ErrorHandler('Product not found', 404);
     }
+
+    if (data.price != null)          data.price          = Math.round(data.price);
+    if (data.compareAtPrice != null) data.compareAtPrice = Math.round(data.compareAtPrice);
 
     product = await Product.findByIdAndUpdate(id, data, {
       new: true,

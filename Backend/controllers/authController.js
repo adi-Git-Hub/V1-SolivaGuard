@@ -186,11 +186,27 @@ exports.revokeOtherSessions = catchAsyncErrors(async (req, res, next) => {
   });
 });
 
+// @desc    Store precise GPS location for the logged-in user (opt-in)
+// @route   POST /api/v1/auth/location
+// @access  Private
+exports.updateLocation = catchAsyncErrors(async (req, res, next) => {
+  const { latitude, longitude } = req.body;
+  const result = await authService.updateGpsLocation(req.user.id, latitude, longitude);
+  return sendResponse(res, {
+    message: 'Location updated',
+    data: { area: result.areaName || null, city: result.lastLoginCity || null },
+  });
+});
+
 // @desc    Get currently logged in user details
 // @route   GET /api/v1/auth/me
 // @access  Private
 exports.getUserProfile = catchAsyncErrors(async (req, res, next) => {
-  const user = await require('../models/userModel').findById(req.user.id);
+  // Login telemetry (IP, precise GPS, ISP) is admin-only — never return it to
+  // the account holder via /auth/me.
+  const user = await require('../models/userModel')
+    .findById(req.user.id)
+    .select('-lastLoginIP -lastLatitude -lastLongitude -lastLoginISP -lastLoginCity -lastLoginState -lastLoginCountry -areaName -subLocality -locality -deviceInfo -browserInfo -osInfo');
   return sendResponse(res, {
     data: { 
       user,

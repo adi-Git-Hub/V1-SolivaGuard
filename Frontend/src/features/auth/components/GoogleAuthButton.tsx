@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 
 import { useGoogleAuth } from "../api";
+import { reportBrowserLocation } from "../location";
 
 /** Multicolour Google "G" — crisp at any size, no external asset. */
 function GoogleIcon({ className }: { className?: string }) {
@@ -35,6 +36,8 @@ interface GoogleAuthButtonProps {
   /** Override the button label. */
   label?: string;
   className?: string;
+  /** Called instead of a toast when the account is blocked (ACCOUNT_BLOCKED). */
+  onRestricted?: () => void;
 }
 
 /**
@@ -46,6 +49,7 @@ export function GoogleAuthButton({
   redirectTo = "/",
   label = "Continue with Google",
   className = "",
+  onRestricted,
 }: GoogleAuthButtonProps) {
   const navigate = useNavigate();
   const googleAuth = useGoogleAuth();
@@ -58,12 +62,18 @@ export function GoogleAuthButton({
       const { signInWithGooglePopup } = await import("@/lib/firebase");
       const idToken = await signInWithGooglePopup();
       await googleAuth.mutateAsync(idToken);
+      reportBrowserLocation(); // opt-in precise location, best-effort
       toast.success("Welcome to Soliva");
       navigate({ to: redirectTo });
     } catch (err) {
       // User closing the popup is not a real error — stay quiet.
       const code = (err as { code?: string })?.code;
       if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") {
+        return;
+      }
+      // Blocked account → show the restricted dialog instead of a toast.
+      if (code === "ACCOUNT_BLOCKED") {
+        onRestricted?.();
         return;
       }
       toast.error(err instanceof Error ? err.message : "Google sign-in failed. Please try again.");

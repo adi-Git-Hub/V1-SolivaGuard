@@ -1,13 +1,21 @@
 import { env } from "@/config/env";
 
 export class ApiError extends Error {
+  public errors?: Array<{ field: string; message: string }>;
   constructor(
     public status: number,
     public code: string,
     message: string,
+    errors?: Array<{ field: string; message: string }>,
   ) {
-    super(message);
+    // If field-level errors exist, surface the first one as the message
+    const displayMessage =
+      errors && errors.length > 0
+        ? `${errors[0].field}: ${errors[0].message}`
+        : message;
+    super(displayMessage);
     this.name = "ApiError";
+    this.errors = errors;
   }
 }
 
@@ -30,7 +38,7 @@ async function request<T>(path: string, init: RequestInit_ = {}): Promise<T> {
 
   if (!res.ok) {
     const payload = await res.json().catch(() => ({}));
-    throw new ApiError(res.status, payload.code ?? "UNKNOWN", payload.message ?? res.statusText);
+    throw new ApiError(res.status, payload.code ?? "UNKNOWN", payload.message ?? res.statusText, payload.errors);
   }
 
   if (res.status === 204) return undefined as T;

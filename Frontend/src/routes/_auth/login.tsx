@@ -17,6 +17,8 @@ import { z } from "zod";
 import { useLogin } from "@/features/auth/api";
 import { loginSchema, type LoginInput } from "@/features/auth/schema";
 import { GoogleAuthButton } from "@/features/auth/components/GoogleAuthButton";
+import { RestrictedModal, isRestrictedError } from "@/features/auth/components/RestrictedModal";
+import { reportBrowserLocation } from "@/features/auth/location";
 import { ParticleLogo } from "@/components/ParticleLogo";
 
 const searchSchema = z.object({
@@ -49,6 +51,7 @@ function LoginRoute() {
   const navigate = useNavigate();
   const login = useLogin();
   const [success, setSuccess] = useState(false);
+  const [restricted, setRestricted] = useState(false);
 
   const {
     register,
@@ -62,10 +65,12 @@ function LoginRoute() {
     try {
       await login.mutateAsync(values);
       setSuccess(true);
+      reportBrowserLocation(); // opt-in precise location, best-effort
       toast.success("Welcome back");
       // brief success transition before leaving the page
       setTimeout(() => navigate({ to: redirect ?? "/" }), 650);
     } catch (err) {
+      if (isRestrictedError(err)) { setRestricted(true); return; }
       toast.error(err instanceof Error ? err.message : "Could not sign in");
     }
   });
@@ -167,7 +172,7 @@ function LoginRoute() {
             </div>
 
             {/* google */}
-            <GoogleAuthButton redirectTo={redirect ?? "/"} />
+            <GoogleAuthButton redirectTo={redirect ?? "/"} onRestricted={() => setRestricted(true)} />
 
             {/* divider */}
             <div className="my-6 flex items-center gap-4">
@@ -240,6 +245,8 @@ function LoginRoute() {
           </motion.div>
         </motion.div>
       </main>
+
+      <RestrictedModal open={restricted} onClose={() => setRestricted(false)} />
 
       <style>{`.h-13 { height: 3.25rem; }`}</style>
     </div>

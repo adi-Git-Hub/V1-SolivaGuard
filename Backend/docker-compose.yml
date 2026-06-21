@@ -23,8 +23,10 @@ services:
 
   mongo:
     image: mongo:latest
+    # Bind to loopback ONLY. The host app connects via 127.0.0.1:27017; exposing
+    # 0.0.0.0 to the internet got this DB ransomwared (READ_ME_TO_RECOVER_YOUR_DATA).
     ports:
-      - "27017:27017"
+      - "127.0.0.1:27017:27017"
     volumes:
       - mongo-data:/data/db
     restart: unless-stopped
@@ -33,8 +35,9 @@ services:
 
   redis:
     image: redis:alpine
+    # Bind to loopback ONLY — never expose Redis to the public internet.
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     volumes:
       - redis-data:/data
     restart: unless-stopped

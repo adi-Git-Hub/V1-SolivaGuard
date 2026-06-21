@@ -44,6 +44,9 @@ const errorHandler = (err, req, res, next) => {
   res.status(err.statusCode).json({
     success: false,
     message: err.message,
+    // Only surface our string error codes (e.g. ACCOUNT_BLOCKED). Mongo's
+    // numeric codes are internal and must not leak to clients.
+    ...(typeof err.code === 'string' ? { code: err.code } : {}),
     stack: process.env.NODE_ENV === 'production' ? null : err.stack,
   });
 };

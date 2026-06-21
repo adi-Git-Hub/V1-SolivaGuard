@@ -8,9 +8,7 @@ import {
   Package,
   Heart,
   LogOut,
-  LayoutDashboard,
   MessageCircle,
-  Mail,
   ChevronRight,
 } from "lucide-react";
 
@@ -58,9 +56,6 @@ export function AccountMenu() {
         { icon: User, label: "Profile", to: "/profile" },
         { icon: Package, label: "Track Order", to: "/profile" },
         { icon: Heart, label: "Wishlist", to: "/collection" },
-        ...(session.user.role === "admin"
-          ? [{ icon: LayoutDashboard, label: "Admin Dashboard", to: "/admin/dashboard" }]
-          : []),
       ]
     : [
         { icon: LogIn, label: "Sign In", to: "/login" },

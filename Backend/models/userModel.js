@@ -61,12 +61,42 @@ const userSchema = new mongoose.Schema(
       enum: ['user', 'admin'],
       default: 'user',
     },
+    // Account moderation state. `blocked` users are rejected at login and are
+    // surfaced separately in the admin customers console. Defaults to active.
+    status: {
+      type: String,
+      enum: ['active', 'blocked'],
+      default: 'active',
+      index: true,
+    },
     isVerified: {
       type: Boolean,
       default: false,
       index: true,
     },
     verifiedAt: Date,
+    // Last successful login — powers the "Active / Inactive" customer signal
+    // and the customer detail drawer. Updated on every successful login.
+    lastLoginAt: Date,
+
+    // ── Login location & device telemetry (admin-only) ─────────────────────
+    // Captured best-effort on every successful login. IP-derived fields are
+    // filled asynchronously; GPS fields are filled only if the browser grants
+    // geolocation permission. None of this is ever exposed to the customer.
+    lastLoginIP:      { type: String, default: null },
+    lastLoginCity:    { type: String, default: null },
+    lastLoginState:   { type: String, default: null },
+    lastLoginCountry: { type: String, default: null },
+    lastLoginISP:     { type: String, default: null },
+    deviceInfo:       { type: String, default: null },  // e.g. "iPhone", "Mac"
+    browserInfo:      { type: String, default: null },  // e.g. "Chrome"
+    osInfo:           { type: String, default: null },  // e.g. "macOS"
+    // Precise GPS (opt-in, reverse-geocoded). Coordinates are admin-only.
+    lastLatitude:     { type: Number, default: null },
+    lastLongitude:    { type: Number, default: null },
+    areaName:         { type: String, default: null },  // e.g. "Dharampeth"
+    subLocality:      { type: String, default: null },
+    locality:         { type: String, default: null },
     // Public URL of the user's avatar image. `null` means "no upload" — the
     // frontend renders a deterministic initials-on-color fallback in that case.
     avatarUrl: {

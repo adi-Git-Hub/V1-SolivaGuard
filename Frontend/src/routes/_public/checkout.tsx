@@ -344,7 +344,7 @@ function CheckoutRoute() {
 
   if (!items.length && !paymentDone) {
     return (
-      <div className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden px-4">
+      <div className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden px-4 pt-[var(--nav-h)]">
         <div className="fixed inset-0">
           <img src="/luxury-bg.webp" alt="" className="h-full w-full object-cover" />
           <div className="absolute inset-0 bg-white/40 backdrop-blur-sm" />
@@ -732,7 +732,7 @@ function CheckoutRoute() {
         <div className="absolute inset-0 backdrop-blur-[2px]" />
       </div>
 
-      <div className="relative z-10 mx-auto max-w-[76rem] px-4 sm:px-6 lg:px-10 pt-24 sm:pt-28 lg:pt-32 pb-36 sm:pb-24">
+      <div className="relative z-10 mx-auto max-w-[76rem] px-4 sm:px-6 lg:px-10 pt-[calc(var(--nav-h)+2rem)] sm:pt-[calc(var(--nav-h)+3rem)] lg:pt-[calc(var(--nav-h)+4rem)] pb-36 sm:pb-24">
         {/* Navigation */}
         <motion.div
           initial={{ opacity: 0 }}

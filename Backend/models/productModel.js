@@ -106,11 +106,10 @@ const productSchema = new mongoose.Schema(
 // Auto-generate slug on first save (or whenever name changes and slug is empty).
 // We deliberately do NOT auto-rename the slug when the name changes on an
 // existing doc — slugs are URLs, and silently rotating them breaks SEO.
-productSchema.pre('save', function (next) {
+productSchema.pre('save', async function () {
   if (!this.slug && this.name) {
     this.slug = slugify(this.name);
   }
-  next();
 });
 
 // Text index for keyword search. Mongo's $text is faster than regex and

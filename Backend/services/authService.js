@@ -7,6 +7,8 @@ const { getOTPTemplate, getWelcomeTemplate, getPasswordChangedTemplate } = requi
 const { enqueueEmail } = require('../queues/emailQueue');
 const { generateAccessToken, generateRefreshToken } = require('../utils/authUtils');
 const firebaseAdmin = require('../config/firebaseAdmin');
+const geo = require('./geoService');
+const User = require('../models/userModel');
 
 function makeOTP() {
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
@@ -154,8 +156,10 @@ class AuthService {
     // Only attach phoneNumber when one was actually provided — never write null,
     // which would collide with other phoneless users on the sparse unique index.
     if (pending.phoneNumber) userData.phoneNumber = pending.phoneNumber;
+    this.applyLoginContext(userData, req);
 
     const user = await authRepository.createUser(userData);
+    this.geolocateLoginAsync(user._id, geo.getClientIp(req));
 
     await authRepository.deletePendingRegistration(normalizedEmail);
     
@@ -261,8 +265,10 @@ class AuthService {
     // fresh one for the device that performed the reset.
     const sessionId = crypto.randomBytes(16).toString('hex');
     user.sessions = [this.generateSession(req, sessionId)];
+    this.applyLoginContext(user, req);
 
     await authRepository.saveUser(user);
+    this.geolocateLoginAsync(user._id, geo.getClientIp(req));
 
     await authRepository.createAuditLog({
       userId: user._id,
@@ -302,6 +308,10 @@ class AuthService {
 
     if (!user.isVerified) throw new ErrorHandler('Please verify your email first', 401);
 
+    if (user.status === 'blocked') {
+      throw new ErrorHandler('Your account has been restricted. Please contact the admin.', 403, 'ACCOUNT_BLOCKED');
+    }
+
     if (user.isLocked) {
       throw new ErrorHandler('Account is temporarily locked', 403);
     }
@@ -323,11 +333,13 @@ class AuthService {
 
     user.loginAttempts = 0;
     user.lockUntil = undefined;
-    
+    this.applyLoginContext(user, req);
+
     const sessionId = crypto.randomBytes(16).toString('hex');
     const newSession = this.generateSession(req, sessionId);
     user.sessions.push(newSession);
     await authRepository.saveUser(user);
+    this.geolocateLoginAsync(user._id, geo.getClientIp(req));
 
     await authRepository.createAuditLog({
       userId: user._id,
@@ -439,6 +451,9 @@ class AuthService {
 
     if (user) {
       // Existing account → link Google on first use, then sign in.
+      if (user.status === 'blocked') {
+        throw new ErrorHandler('Your account has been restricted. Please contact the admin.', 403, 'ACCOUNT_BLOCKED');
+      }
       if (user.isLocked) throw new ErrorHandler('Account is temporarily locked', 403);
       if (!user.googleId) user.googleId = uid;
       if (!user.avatarUrl && picture) user.avatarUrl = picture;
@@ -449,6 +464,7 @@ class AuthService {
       user.loginAttempts = 0;
       user.lockUntil = undefined;
       user.sessions.push(newSession);
+      this.applyLoginContext(user, req);
       await authRepository.saveUser(user);
 
       await authRepository.createAuditLog({
@@ -466,7 +482,7 @@ class AuthService {
         username = `${base}${crypto.randomBytes(2).toString('hex')}`;
       }
 
-      user = await authRepository.createUser({
+      const newUserData = {
         name: name || normalizedEmail.split('@')[0],
         username,
         email: normalizedEmail,
@@ -476,7 +492,9 @@ class AuthService {
         isVerified: true,
         verifiedAt: new Date(),
         sessions: [newSession],
-      });
+      };
+      this.applyLoginContext(newUserData, req);
+      user = await authRepository.createUser(newUserData);
 
       await authRepository.createAuditLog({
         userId: user._id,
@@ -499,10 +517,59 @@ class AuthService {
       }
     }
 
+    this.geolocateLoginAsync(user._id, geo.getClientIp(req));
+
     const accessToken = generateAccessToken(user._id, sessionId);
     const refreshToken = generateRefreshToken(user._id, sessionId);
 
     return { user, accessToken, refreshToken };
+  }
+
+  /**
+   * Stamp synchronous login telemetry (time, IP, device/browser/OS) onto a user
+   * doc or a plain createUser payload. Safe — never throws, never awaits.
+   * Accepts a mongoose doc OR a plain object so it works for both existing-user
+   * logins and new-user creation paths.
+   */
+  applyLoginContext(target, req) {
+    try {
+      const { browserInfo, osInfo, deviceInfo } = geo.parseUserAgent(req.headers['user-agent']);
+      target.lastLoginAt  = new Date();
+      target.lastLoginIP  = geo.getClientIp(req);
+      target.deviceInfo   = deviceInfo;
+      target.browserInfo  = browserInfo;
+      target.osInfo       = osInfo;
+    } catch { /* telemetry must never break auth */ }
+  }
+
+  /**
+   * Fire-and-forget IP → city/state/country/ISP enrichment. Runs after the
+   * login response is sent; failures are swallowed so auth is never affected.
+   */
+  geolocateLoginAsync(userId, ip) {
+    geo.lookupIpLocation(ip)
+      .then((loc) => { if (loc) return User.updateOne({ _id: userId }, { $set: loc }); })
+      .catch(() => {});
+  }
+
+  /**
+   * Persist precise GPS coordinates (opt-in, from the browser) and the
+   * reverse-geocoded area/locality. Validates the coordinate range; geocoding
+   * failure is non-fatal (coordinates are still stored).
+   */
+  async updateGpsLocation(userId, latitude, longitude) {
+    const lat = Number(latitude);
+    const lon = Number(longitude);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180) {
+      throw new ErrorHandler('Invalid coordinates', 400);
+    }
+    const set = { lastLatitude: lat, lastLongitude: lon };
+    const geocoded = await geo.reverseGeocode(lat, lon);
+    if (geocoded) {
+      for (const [k, v] of Object.entries(geocoded)) if (v) set[k] = v;
+    }
+    await User.updateOne({ _id: userId }, { $set: set });
+    return set;
   }
 
   generateSession(req, sessionId) {

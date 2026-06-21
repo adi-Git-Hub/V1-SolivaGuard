@@ -28,6 +28,16 @@
 
 :root {
   /* ════════════════════════════════════════════════════════════════════════
+   * 0. LAYOUT TOKENS
+   * --------------------------------------------------------------------------
+   * Shared structural measurements. Keep in sync with Header.tsx h-[68px].
+   * ════════════════════════════════════════════════════════════════════════ */
+
+  /* Fixed navbar height — both scroll states use h-[68px] inner pill.
+     Pages that need to clear the fixed header use calc(var(--nav-h) + Xrem). */
+  --nav-h: 68px;
+
+  /* ════════════════════════════════════════════════════════════════════════
    * 1. TYPOGRAPHY
    * --------------------------------------------------------------------------
    * Editorial luxury ladder. Display sizes use clamp() for fluid scaling

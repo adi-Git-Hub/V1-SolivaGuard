@@ -1,5 +1,11 @@
 const { z } = require('zod');
 
+// Accepts full https:// URLs and relative paths (e.g. /product_images/foo.webp)
+const imageUrl = z.string().min(1).refine(
+  v => /^https?:\/\//i.test(v) || v.startsWith('/'),
+  { message: 'Image URL must be a full URL or a relative path starting with /' }
+);
+
 // Public product detail route now accepts EITHER a Mongo ObjectId or a slug.
 // We validate "non-empty short string"; the service distinguishes the two.
 const idOrSlug = z
@@ -22,7 +28,7 @@ const productValidator = {
       status: z.enum(['active', 'draft', 'archived']).optional(),
       stock: z.number().int().min(0, 'Stock cannot be negative'),
       images: z
-        .array(z.object({ url: z.string().url('Invalid image URL') }))
+        .array(z.object({ url: imageUrl }))
         .min(1, 'At least one image is required'),
     }),
   }),
@@ -40,7 +46,7 @@ const productValidator = {
       featured: z.boolean().optional(),
       status: z.enum(['active', 'draft', 'archived']).optional(),
       stock: z.number().int().min(0).optional(),
-      images: z.array(z.object({ url: z.string().url() })).optional(),
+      images: z.array(z.object({ url: imageUrl })).optional(),
     }),
     params: z.object({
       // Admin endpoints still operate on ObjectId only.

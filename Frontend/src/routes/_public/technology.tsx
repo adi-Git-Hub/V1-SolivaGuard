@@ -59,8 +59,22 @@ function Depth({ children, className = "" }: { children: React.ReactNode; classN
 function HowItWorksRoute() {
   return (
     <div className="relative w-full bg-[#FAF7F3] overflow-x-hidden text-[#3a2a22]">
+
       {/* ══════════════════════ CHAPTER ONE — DESIGNED TO PROTECT ══════════════════════ */}
       <section className="relative pt-24 pb-16 sm:pt-28 sm:pb-24">
+
+        {/* ── Sun ambient atmosphere: warm amber bloom layers ── */}
+        <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
+          {/* primary deep bloom — top right, mirrors SunlightVisual */}
+          <div className="absolute -top-28 right-[-10%] h-[72%] w-[68%] rounded-full bg-[radial-gradient(circle,rgba(210,138,61,0.16)_0%,rgba(184,132,69,0.07)_38%,transparent_66%)] blur-3xl" />
+          {/* secondary soft bloom — center left, counterpoint depth */}
+          <div className="absolute top-[35%] left-[-8%] h-[50%] w-[46%] rounded-full bg-[radial-gradient(circle,rgba(246,199,122,0.09),transparent_60%)] blur-2xl" />
+          {/* diagonal light shaft — crepuscular ray across the section */}
+          <div className="absolute inset-0 bg-[linear-gradient(148deg,rgba(246,199,122,0.07)_0%,transparent_42%)]" />
+          {/* bottom warm haze to bleed into next section */}
+          <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-[#F6C77A]/06 to-transparent" />
+        </div>
+
         <div className="mx-auto max-w-[1340px] w-full px-5 sm:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-[1.05fr_0.95fr] gap-10 lg:gap-20 items-center">
             <motion.div
@@ -108,6 +122,15 @@ function HowItWorksRoute() {
 
       {/* ══════════════════════ CHAPTER THREE — COMFORT WITHOUT COMPROMISE ══════════════════════ */}
       <section className="relative min-h-screen flex flex-col justify-center py-14">
+
+        {/* ── Wind atmosphere: cool blue air ingress left, warm amber heat exhaust right ── */}
+        <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
+          <div className="absolute inset-y-0 left-0 w-[48%] bg-[radial-gradient(ellipse_90%_80%_at_left_center,rgba(96,165,250,0.07),transparent)]" />
+          <div className="absolute inset-y-0 right-0 w-[48%] bg-[radial-gradient(ellipse_90%_80%_at_right_center,rgba(210,138,61,0.07),transparent)]" />
+          {/* very subtle blue-to-amber midline shimmer */}
+          <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(147,197,253,0.03)_0%,transparent_48%,rgba(246,199,122,0.03)_100%)]" />
+        </div>
+
         <div className="mx-auto max-w-[1340px] w-full px-5 sm:px-8">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -148,6 +171,14 @@ function HowItWorksRoute() {
 
       {/* ══════════════════════ CHAPTER FOUR — COVERAGE WHERE IT MATTERS ══════════════════════ */}
       <section className="relative min-h-screen flex flex-col justify-center bg-[#F3ECE2]/40 border-y border-[#3a2a22]/8 py-10 sm:py-12">
+
+        {/* ── Protection atmosphere: warm amber shield glow right, secondary left ── */}
+        <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
+          <div className="absolute right-[-8%] top-[-12%] h-[70%] w-[58%] rounded-full bg-[radial-gradient(circle,rgba(199,102,0,0.11)_0%,rgba(210,138,61,0.05)_38%,transparent_64%)] blur-3xl" />
+          <div className="absolute left-[-6%] bottom-[-10%] h-[52%] w-[44%] rounded-full bg-[radial-gradient(circle,rgba(246,199,122,0.08),transparent_65%)] blur-2xl" />
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_50%_at_70%_50%,rgba(199,102,0,0.04),transparent)]" />
+        </div>
+
         <div className="mx-auto max-w-[1340px] w-full px-5 sm:px-8">
           {/* Header — headline, centered */}
           <motion.div
@@ -197,7 +228,15 @@ function HowItWorksRoute() {
 
       {/* ══════════════════════ EPILOGUE — EXPLORE THE COLLECTION ══════════════════════ */}
       <section className="relative flex items-center bg-[#2a1d16] text-[#FAF7F3] overflow-hidden py-24 sm:py-32">
-        <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_50%_40%,rgba(245,130,13,0.06),transparent_62%)]" />
+
+        {/* ── Enhanced dark section atmosphere ── */}
+        {/* Primary centre bloom — boosted from 0.06 to 0.11 */}
+        <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_50%_40%,rgba(245,130,13,0.11),transparent_60%)]" />
+        {/* Warm side fills — asymmetric depth */}
+        <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_18%_65%,rgba(217,178,122,0.06),transparent_50%)]" />
+        <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_82%_35%,rgba(199,102,0,0.05),transparent_48%)]" />
+        {/* diagonal light shaft */}
+        <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(135deg,rgba(217,178,122,0.04)_0%,transparent_50%)]" />
 
         <div className="relative z-10 mx-auto max-w-[1340px] w-full px-5 sm:px-8">
           <motion.div

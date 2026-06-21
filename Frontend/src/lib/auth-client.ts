@@ -133,6 +133,11 @@ export const authClient = {
     return { user: normalizeUser(res.data.user) };
   },
 
+  async adminLogin(input: { email: string; password: string }): Promise<Session> {
+    const res = await api.post<EnvelopedResponse<{ user: unknown }>>("/auth/admin-login", input);
+    return { user: normalizeUser(res.data.user) };
+  },
+
   async logout(): Promise<void> {
     await api.get<EnvelopedResponse<unknown>>("/auth/logout");
   },

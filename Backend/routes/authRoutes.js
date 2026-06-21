@@ -13,7 +13,8 @@ const {
   verifyForgotOTP,
   logoutAll,
   revokeSession,
-  refreshToken
+  refreshToken,
+  updateLocation
 } = require('../controllers/authController');
 
 const { isAuthenticatedUser } = require('../middleware/authMiddleware');
@@ -54,6 +55,7 @@ router.post('/reset-password', validate(authValidator.resetPassword), resetPassw
 router.get('/logout', isAuthenticatedUser, logout);
 router.get('/logout-all', isAuthenticatedUser, logoutAll);
 router.get('/me', isAuthenticatedUser, getUserProfile);
+router.post('/location', isAuthenticatedUser, updateLocation);
 
 router.get('/sessions', isAuthenticatedUser, async (req, res) => {
   const user = await require('../models/userModel').findById(req.user.id).select('+sessions');

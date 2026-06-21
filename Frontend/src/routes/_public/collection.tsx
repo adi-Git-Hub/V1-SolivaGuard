@@ -1,10 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { viewportOnce, ease } from "@/design-system";
 import { FutureCollections } from "@/components/FutureCollections";
 import { useCart } from "@/features/cart/hooks/useCart";
 import { useCheckoutStore } from "@/features/checkout/store";
+import { useProducts } from "@/features/catalog/api";
 import {
   Check,
   ArrowRight,
@@ -40,66 +41,46 @@ export const Route = createFileRoute("/_public/collection")({
   }),
 });
 
-/* ── One product · five editions · four gallery views each.
-   Exact edition naming kept consistent site-wide. ── */
-const editions = [
-  {
-    id: "blush-pink",
-    name: "Blush Pink",
-    swatch: "#E4B7C6",
-    images: [
-      { view: "Front View", src: "/product_images/pink-1.webp" },
-      { view: "Side View", src: "/product_images/pink-3.webp" },
-      { view: "Back View", src: "/product_images/pink-2.webp" },
-      { view: "Lifestyle View", src: "/product_images/pink-4.webp" },
-    ],
-  },
-  {
-    id: "green-edition",
-    name: "Olive Green",
-    swatch: "#6A7038",
-    images: [
-      { view: "Front View", src: "/product_images/olive-1.webp" },
-      { view: "Side View", src: "/product_images/olive-3.webp" },
-      { view: "Back View", src: "/product_images/olive-2.webp" },
-      { view: "Lifestyle View", src: "/product_images/olive-4.webp" },
-    ],
-  },
-  {
-    id: "deep-blue",
-    name: "Deep Blue",
-    swatch: "#33508A",
-    images: [
-      { view: "Front View", src: "/product_images/blue-1.webp" },
-      { view: "Side View", src: "/product_images/blue-3.webp" },
-      { view: "Back View", src: "/product_images/blue-2.webp" },
-      { view: "Lifestyle View", src: "/product_images/blue-4.webp" },
-    ],
-  },
-  {
-    id: "classic-beige",
-    name: "Classic Beige",
-    swatch: "#D8C3A0",
-    images: [
-      { view: "Front View", src: "/product_images/beige-1.webp" },
-      { view: "Side View", src: "/product_images/beige-3.webp" },
-      { view: "Back View", src: "/product_images/beige-2.webp" },
-      { view: "Lifestyle View", src: "/product_images/beige-4.webp" },
-    ],
-  },
-  {
-    id: "zesty-lime",
-    name: "Zesty Lime",
-    swatch: "#AEC96B",
-    images: [
-      { view: "Front View", src: "/product_images/lime-1.webp" },
-      { view: "Side View", src: "/product_images/lime-3.webp" },
-      { view: "Back View", src: "/product_images/lime-2.webp" },
-      { view: "Lifestyle View", src: "/product_images/lime-4.webp" },
-    ],
-    isUnavailable: true,
-  },
-] as const;
+/* ── UI-only config per product slug: swatch colour + gallery view labels.
+   These are presentation details not worth storing in the DB. ── */
+const SWATCH_CONFIG: Record<string, {
+  swatch: string;
+  order: number;
+  views: [string, string, string, string];
+}> = {
+  "sunwrap-blush-pink":    { swatch: "#E4B7C6", order: 0, views: ["Front View", "Side View", "Back View", "Lifestyle View"] },
+  "sunwrap-olive-green":   { swatch: "#6A7038", order: 1, views: ["Front View", "Side View", "Back View", "Lifestyle View"] },
+  "sunwrap-deep-blue":     { swatch: "#33508A", order: 2, views: ["Front View", "Side View", "Back View", "Lifestyle View"] },
+  "sunwrap-classic-beige": { swatch: "#D8C3A0", order: 3, views: ["Front View", "Side View", "Back View", "Lifestyle View"] },
+  "sunwrap-zesty-lime":    { swatch: "#AEC96B", order: 4, views: ["Front View", "Side View", "Back View", "Lifestyle View"] },
+};
+
+type LiveEdition = {
+  id: string;
+  productId: string;
+  name: string;
+  swatch: string;
+  priceCents: number;
+  compareAtCents: number | null;
+  images: Array<{ view: string; src: string }>;
+  isUnavailable: boolean;
+};
+
+/* ── Fallback editions ──────────────────────────────────────────────────
+   The storefront's SunWrap showcase must always render, even when the
+   products API returns nothing (empty/unseeded DB). Without this, an empty
+   `editions` array left the page stuck on a loading spinner forever. */
+const VIEWS: [string, string, string, string] = ["Front View", "Side View", "Back View", "Lifestyle View"];
+const fallbackImages = (color: string) =>
+  [1, 2, 3, 4].map((n, i) => ({ view: VIEWS[i], src: `/product_images/${color}-${n}.webp` }));
+
+const FALLBACK_EDITIONS: LiveEdition[] = [
+  { id: "sunwrap-blush-pink",    productId: "sunwrap-blush-pink",    name: "Blush Pink",    swatch: "#E4B7C6", priceCents: 79900, compareAtCents: 120000, images: fallbackImages("pink"),  isUnavailable: false },
+  { id: "sunwrap-olive-green",   productId: "sunwrap-olive-green",   name: "Olive Green",   swatch: "#6A7038", priceCents: 79900, compareAtCents: 120000, images: fallbackImages("olive"), isUnavailable: false },
+  { id: "sunwrap-deep-blue",     productId: "sunwrap-deep-blue",     name: "Deep Blue",     swatch: "#33508A", priceCents: 79900, compareAtCents: 120000, images: fallbackImages("blue"),  isUnavailable: false },
+  { id: "sunwrap-classic-beige", productId: "sunwrap-classic-beige", name: "Classic Beige", swatch: "#D8C3A0", priceCents: 79900, compareAtCents: 120000, images: fallbackImages("beige"), isUnavailable: false },
+  { id: "sunwrap-zesty-lime",    productId: "sunwrap-zesty-lime",    name: "Zesty Lime",    swatch: "#AEC96B", priceCents: 79900, compareAtCents: 120000, images: fallbackImages("lime"),  isUnavailable: false },
+];
 
 const lifestyleTags = [
   { emoji: "🛵", label: "Daily Commutes" },
@@ -166,33 +147,59 @@ const slideVariants = {
 
 function CollectionRoute() {
   const { edition: editionParam } = Route.useSearch();
-  const [editionIndex, setEditionIndex] = useState(() => {
-    if (editionParam) {
-      const idx = editions.findIndex((e) => e.id === editionParam);
-      return idx !== -1 ? idx : 0;
-    }
-    return 0;
-  });
+
+  // ── Fetch live products from MongoDB ──────────────────────────────────
+  const { data: rawProducts = [] } = useProducts({
+    category: "protection",
+    limit: 10,
+  } as any);
+
+  const editions = useMemo<LiveEdition[]>(() => {
+    const mapped = rawProducts
+      .map((p) => {
+        const cfg = SWATCH_CONFIG[p.slug] ?? { swatch: "#B88445", order: 99, views: ["Front View", "Side View", "Back View", "Lifestyle View"] as [string,string,string,string] };
+        const colorName = p.name.includes("—") ? p.name.split("—")[1].trim() : p.name;
+        return {
+          id: p.slug,
+          productId: p.id,
+          name: colorName,
+          swatch: cfg.swatch,
+          priceCents: p.priceCents,
+          compareAtCents: p.compareAtCents ?? null,
+          images: p.images.slice(0, 4).map((src, i) => ({
+            view: cfg.views[i] ?? `View ${i + 1}`,
+            src,
+          })),
+          isUnavailable: !p.inStock,
+          _order: cfg.order,
+        };
+      })
+      .sort((a, b) => a._order - b._order);
+    // Empty/unseeded DB → render the built-in SunWrap editions instead of
+    // hanging on a spinner. Live products take over once the API returns any.
+    return mapped.length > 0 ? mapped : FALLBACK_EDITIONS;
+  }, [rawProducts]);
+
+  const [editionIndex, setEditionIndex] = useState(0);
 
   useEffect(() => {
-    if (editionParam) {
-      const idx = editions.findIndex((e) => e.id === editionParam);
-      if (idx !== -1) setEditionIndex(idx);
-    }
-  }, [editionParam]);
+    if (!editionParam || editions.length === 0) return;
+    const idx = editions.findIndex((e) => e.id === editionParam);
+    if (idx !== -1) setEditionIndex(idx);
+  }, [editionParam, editions]);
 
   const [viewIndex, setViewIndex] = useState(0);
-  const [direction, setDirection] = useState(0); // slide direction: 1 = next, -1 = prev
+  const [direction, setDirection] = useState(0);
   const [added, setAdded] = useState(false);
   const cart = useCart();
   const navigate = useNavigate();
   const setCheckoutItems = useCheckoutStore((s) => s.setItems);
 
-  const edition = editions[editionIndex];
-  const image = edition.images[viewIndex];
-  const VIEW_COUNT = edition.images.length;
+  // While products are loading, show the first edition slot as a skeleton.
+  const edition: LiveEdition | undefined = editions[editionIndex];
+  const image = edition?.images[viewIndex];
+  const VIEW_COUNT = edition?.images.length ?? 4;
 
-  // Switching colour resets the gallery to the Front View of that edition.
   const selectEdition = (i: number) => {
     setDirection(0);
     setEditionIndex(i);
@@ -206,7 +213,6 @@ function CollectionRoute() {
     setDirection(-1);
     setViewIndex((v) => (v - 1 + VIEW_COUNT) % VIEW_COUNT);
   };
-  // Jump straight to a view (thumbnails) — slide toward the target.
   const goToView = (i: number) => {
     setDirection(i >= viewIndex ? 1 : -1);
     setViewIndex(i);
@@ -215,13 +221,14 @@ function CollectionRoute() {
   const reduce = useReducedMotion();
 
   const addToCart = () => {
+    if (!edition) return;
     cart.add({
-      productId: "soliva-sunwrap",
+      productId: edition.productId,
       variant: edition.id,
       slug: edition.id,
       name: `SunWrap by Soliva — ${edition.name}`,
-      image: edition.images[0].src,
-      priceCents: 79900,
+      image: edition.images[0]?.src ?? "",
+      priceCents: edition.priceCents,
       currency: "INR",
       quantity: 1,
     });
@@ -229,21 +236,29 @@ function CollectionRoute() {
     setTimeout(() => setAdded(false), 2000);
   };
 
-  // Buy Now → stage this edition as the checkout line, then jump to the
-  // checkout page (address/details) which in turn opens Razorpay.
   const buyNow = () => {
+    if (!edition) return;
     setCheckoutItems([
       {
-        productId: "soliva-sunwrap",
+        productId: edition.productId,
         variant: edition.id,
         name: `SunWrap by Soliva — ${edition.name}`,
-        image: edition.images[0].src,
-        price: 799,
+        image: edition.images[0]?.src ?? "",
+        price: edition.priceCents / 100,
         quantity: 1,
       },
     ]);
     navigate({ to: "/checkout" });
   };
+
+  // Nothing to render while editions are loading
+  if (editions.length === 0 || !edition) {
+    return (
+      <div className="relative w-full bg-[#FAF7F3] min-h-screen flex items-center justify-center">
+        <div className="h-5 w-5 animate-spin rounded-full border-2 border-[#B88445]/30 border-t-[#B88445]" />
+      </div>
+    );
+  }
 
   return (
     <div className="relative w-full bg-[#FAF7F3] text-[#3a2a22] pb-24 lg:pb-0">
@@ -534,11 +549,13 @@ function CollectionRoute() {
                       className="font-display leading-none tracking-tight text-[#3a2a22]"
                       style={{ fontSize: "clamp(2.4rem, 4vw, 3rem)" }}
                     >
-                      ₹799
+                      ₹{Math.round(edition.priceCents / 100)}
                     </span>
-                    <span className="text-[1.05rem] font-light text-[#7b6a5f]/65 line-through decoration-[#7b6a5f]/40">
-                      MRP ₹999
-                    </span>
+                    {edition.compareAtCents && edition.compareAtCents > edition.priceCents && (
+                      <span className="text-[1.05rem] font-light text-[#7b6a5f]/65 line-through decoration-[#7b6a5f]/40">
+                        MRP ₹{Math.round(edition.compareAtCents / 100)}
+                      </span>
+                    )}
                   </div>
                 )}
                 <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-[0.75rem] font-medium text-[#3a2a22]/70">
@@ -664,8 +681,10 @@ function CollectionRoute() {
             <span className="font-display text-lg text-[#3a2a22]">Sold Out</span>
           ) : (
             <>
-              <span className="font-display text-xl text-[#3a2a22]">₹799</span>
-              <span className="text-[0.65rem] text-[#7b6a5f]/70 line-through">₹999</span>
+              <span className="font-display text-xl text-[#3a2a22]">₹{Math.round(edition.priceCents / 100)}</span>
+              {edition.compareAtCents && edition.compareAtCents > edition.priceCents && (
+                <span className="text-[0.65rem] text-[#7b6a5f]/70 line-through">₹{Math.round(edition.compareAtCents / 100)}</span>
+              )}
             </>
           )}
         </div>

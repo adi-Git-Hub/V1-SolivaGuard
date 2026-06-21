@@ -43,6 +43,17 @@ export function useLogin() {
   });
 }
 
+export function useAdminLogin() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { email: string; password: string }) => authClient.adminLogin(input),
+    onSuccess: (session) => {
+      qc.setQueryData(sessionQueryKey, session);
+      qc.invalidateQueries({ queryKey: sessionQueryKey });
+    },
+  });
+}
+
 export function useRegister() {
   // Register itself does NOT create a session — backend sends an OTP email.
   // The component handles OTP verification on the same page after success.
