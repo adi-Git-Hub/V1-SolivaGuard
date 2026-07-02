@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   app:
     build: .
@@ -8,34 +6,53 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=5000
-      - MONGO_URI=mongodb://mongo:27017/soliva
+      - MONGO_URI=${MONGO_URI:-mongodb://admin:password@mongo:27017/soliva?authSource=admin}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      # Note: Include other production secrets via .env file or orchestrator
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-replace_me}
     env_file:
       - .env
     depends_on:
-      - mongo
-      - redis
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - soliva-network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 512M
 
   mongo:
     image: mongo:latest
-    # Bind to loopback ONLY. The host app connects via 127.0.0.1:27017; exposing
-    # 0.0.0.0 to the internet got this DB ransomwared (READ_ME_TO_RECOVER_YOUR_DATA).
     ports:
       - "127.0.0.1:27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME:-admin}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:-password}
     volumes:
       - mongo-data:/data/db
     restart: unless-stopped
     networks:
       - soliva-network
+    healthcheck:
+      test: ["CMD", "mongosh", "-u", "${MONGO_ROOT_USERNAME:-admin}", "-p", "${MONGO_ROOT_PASSWORD:-password}", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 1G
 
   redis:
     image: redis:alpine
-    # Bind to loopback ONLY — never expose Redis to the public internet.
+    command: redis-server --requirepass ${REDIS_PASSWORD:-replace_me}
     ports:
       - "127.0.0.1:6379:6379"
     volumes:
@@ -43,6 +60,17 @@ services:
     restart: unless-stopped
     networks:
       - soliva-network
+    healthcheck:
+      test: ["CMD", "sh", "-c", "redis-cli -a ${REDIS_PASSWORD:-replace_me} ping | grep PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
 
 volumes:
   mongo-data:

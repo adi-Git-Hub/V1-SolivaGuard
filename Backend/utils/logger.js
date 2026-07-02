@@ -50,10 +50,14 @@ const transports = [
     filename: path.join('logs', 'error.log'),
     level: 'error',
     format: winston.format.combine(winston.format.uncolorize(), format),
+    maxsize: 5242880, // 5MB
+    maxFiles: 5,
   }),
   new winston.transports.File({
     filename: path.join('logs', 'combined.log'),
     format: winston.format.combine(winston.format.uncolorize(), format),
+    maxsize: 5242880, // 5MB
+    maxFiles: 5,
   }),
 ];
 

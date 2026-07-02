@@ -9,6 +9,7 @@ const { generateAccessToken, generateRefreshToken } = require('../utils/authUtil
 const firebaseAdmin = require('../config/firebaseAdmin');
 const geo = require('./geoService');
 const User = require('../models/userModel');
+const jwt = require('jsonwebtoken');
 
 function makeOTP() {
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
@@ -82,9 +83,7 @@ class AuthService {
       device: req.headers['user-agent'],
     });
 
-    if (process.env.NODE_ENV === 'development') {
-      logger.info(`[DEV-OTP] register · email=${normalizedEmail} · otp=${otp}`);
-    }
+
 
     const html = getOTPTemplate(otp, 'verification');
     await enqueueEmail('registrationOTP', {
@@ -111,9 +110,7 @@ class AuthService {
       otpExpire: otpExpiryDate(),
     });
 
-    if (process.env.NODE_ENV === 'development') {
-      logger.info(`[DEV-OTP] resend · email=${normalizedEmail} · otp=${otp}`);
-    }
+
 
     const html = getOTPTemplate(otp, 'verification');
     await enqueueEmail('registrationOTP', {
@@ -203,9 +200,7 @@ class AuthService {
       status: 'success',
     });
 
-    if (process.env.NODE_ENV === 'development') {
-      logger.info(`[DEV-OTP] forgot-password · email=${normalizedEmail} · otp=${otp}`);
-    }
+
 
     const html = getOTPTemplate(otp, 'forgotPassword');
     await enqueueEmail('forgotPasswordOTP', {

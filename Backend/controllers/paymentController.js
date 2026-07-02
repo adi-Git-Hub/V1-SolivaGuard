@@ -8,15 +8,23 @@ const sendResponse = require('../utils/sendResponse');
 // @route   POST /api/v1/payment/webhook
 // @access  Public
 exports.razorpayWebhook = catchAsyncErrors(async (req, res, next) => {
-  const secret = process.env.RAZORPAY_WEBHOOK_SECRET || 'dummy_webhook_secret';
-  const signature = req.headers['x-razorpay-signature'];
+  const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
+  if (!secret || secret === 'dummy_webhook_secret') {
+    throw new Error('RAZORPAY_WEBHOOK_SECRET is not configured');
+  }
+  
+  const signature = req.headers['x-razorpay-signature'] || '';
+  const payloadStr = req.rawBody || JSON.stringify(req.body);
 
   const expectedSignature = crypto
     .createHmac('sha256', secret)
-    .update(JSON.stringify(req.body))
+    .update(payloadStr)
     .digest('hex');
 
-  if (expectedSignature === signature) {
+  const isValid = (signature.length === expectedSignature.length) && 
+                  crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature));
+
+  if (isValid) {
     const event = req.body.event;
     const payload = req.body.payload;
 

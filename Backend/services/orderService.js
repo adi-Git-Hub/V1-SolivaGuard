@@ -48,17 +48,13 @@ class OrderService {
         }
       }
 
-      const { shippingInfo, orderItems, itemsPrice, taxPrice, shippingPrice, totalPrice } = data;
+      const { shippingInfo, orderItems, taxPrice, shippingPrice } = data;
 
-      // The storefront sells a showcase product (SunWrap) that has no Product
-      // document in the catalogue. Enforce stock only for real catalogue
-      // products (valid ObjectIds that exist); tolerate showcase items so
-      // checkout/payment still works. Each line keeps its denormalized
-      // name/price/image and gets a synthetic product ref when it isn't a real
-      // catalogue product.
+      let serverItemsPrice = 0;
       const safeOrderItems = [];
       for (const item of orderItems) {
         let productRef = item.product;
+        let realPrice = item.price; // Default to client provided price for showcase items
 
         if (mongoose.Types.ObjectId.isValid(productRef)) {
           const product = await Product.findOneAndUpdate(
@@ -74,24 +70,29 @@ class OrderService {
             }
             // Valid-looking id but no such product → treat as a showcase item.
             productRef = new mongoose.Types.ObjectId();
+          } else {
+            realPrice = product.price; // Use authoritative price from database
           }
         } else {
           // Not a real ObjectId (e.g. "soliva-sunwrap") → showcase item.
           productRef = new mongoose.Types.ObjectId();
         }
 
-        safeOrderItems.push({ ...item, product: productRef });
+        serverItemsPrice += realPrice * item.quantity;
+        safeOrderItems.push({ ...item, product: productRef, price: realPrice });
       }
 
-      const razorpayOrder = await paymentService.createRazorpayOrder(totalPrice);
+      const serverTotalPrice = serverItemsPrice + (taxPrice || 0) + (shippingPrice || 0);
+
+      const razorpayOrder = await paymentService.createRazorpayOrder(serverTotalPrice);
 
       const orderData = {
         shippingInfo,
         orderItems: safeOrderItems,
-        itemsPrice,
+        itemsPrice: serverItemsPrice,
         taxPrice,
         shippingPrice,
-        totalPrice,
+        totalPrice: serverTotalPrice,
         paymentInfo: {
           razorpay_order_id: razorpayOrder.id,
           status: 'pending',
@@ -148,6 +149,16 @@ class OrderService {
   async verifyPayment(data) {
     const { razorpay_order_id, razorpay_payment_id, razorpay_signature, orderId } = data;
 
+    const order = await Order.findById(orderId);
+    if (!order) {
+      throw new ErrorHandler('Order not found', 404);
+    }
+
+    if (order.paymentInfo.razorpay_order_id !== razorpay_order_id) {
+      logger.warn(`[PAYMENT] Razorpay Order ID mismatch for Order: ${orderId}`);
+      throw new ErrorHandler('Payment validation failed', 400);
+    }
+
     const isValid = paymentService.verifySignature(
       razorpay_order_id,
       razorpay_payment_id,
@@ -157,11 +168,6 @@ class OrderService {
     if (!isValid) {
       logger.warn(`[PAYMENT] Invalid Payment Signature for Order: ${orderId}`);
       throw new ErrorHandler('Invalid signature sent!', 400);
-    }
-
-    const order = await Order.findById(orderId);
-    if (!order) {
-      throw new ErrorHandler('Order not found', 404);
     }
 
     if (order.paymentInfo.status === 'paid' || order.orderStatus === 'paid') {

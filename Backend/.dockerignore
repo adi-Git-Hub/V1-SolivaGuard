@@ -1,0 +1,9 @@
+node_modules/
+.env
+.env.*
+logs/
+uploads/
+.git/
+.gitignore
+*.log
+*.pid

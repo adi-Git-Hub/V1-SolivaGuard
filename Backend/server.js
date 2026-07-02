@@ -35,3 +35,26 @@ process.on('unhandledRejection', (err) => {
     process.exit(1);
   });
 });
+
+// Graceful shutdown
+const shutdown = () => {
+  logger.info('SIGTERM/SIGINT received. Shutting down gracefully...');
+  server.close(async () => {
+    logger.info('HTTP server closed.');
+    const mongoose = require('mongoose');
+    if (mongoose.connection.readyState === 1) {
+      await mongoose.connection.close(false);
+      logger.info('MongoDB connection closed.');
+    }
+    process.exit(0);
+  });
+  
+  // Force close after 10s
+  setTimeout(() => {
+    logger.error('Could not close connections in time, forcefully shutting down');
+    process.exit(1);
+  }, 10000);
+};
+
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);

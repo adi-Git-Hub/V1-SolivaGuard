@@ -37,8 +37,14 @@ const otpLimiter = rateLimit({
   message: { success: false, message: 'Too many OTP requests, please try again later.' }
 });
 
-router.post('/register', validate(authValidator.register), registerUser);
-router.post('/verify-email', validate(authValidator.verifyEmail), verifyEmail);
+const registerLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 5,
+  message: { success: false, message: 'Too many registration attempts, please try again later.' }
+});
+
+router.post('/register', registerLimiter, validate(authValidator.register), registerUser);
+router.post('/verify-email', otpLimiter, validate(authValidator.verifyEmail), verifyEmail);
 router.post('/resend-otp', otpLimiter, validate(authValidator.forgotPassword), resendOTP); // Using same validator (needs email)
 
 router.post('/login', loginLimiter, validate(authValidator.login), loginUser);

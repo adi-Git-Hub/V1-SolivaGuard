@@ -1,5 +1,6 @@
 const orderService = require('../services/orderService');
 const catchAsyncErrors = require('../middleware/catchAsyncErrors');
+const ErrorHandler = require('../utils/errorHandler');
 const sendResponse = require('../utils/sendResponse');
 
 // @desc    Create new order & Razorpay order
@@ -31,6 +32,10 @@ exports.verifyPayment = catchAsyncErrors(async (req, res, next) => {
 // @access  Private
 exports.getSingleOrder = catchAsyncErrors(async (req, res, next) => {
   const order = await orderService.getSingleOrder(req.params.id);
+
+  if (order.user._id.toString() !== req.user.id && req.user.role !== 'admin') {
+    return next(new ErrorHandler('Not authorized to access this order', 403));
+  }
 
   return sendResponse(res, {
     data: { order },

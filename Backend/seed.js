@@ -86,12 +86,18 @@ const seedDB = async () => {
   try {
     await Product.deleteMany();
 
-    await User.deleteMany({ email: 'admin@soliva.com' });
+    // Admin bootstrap credentials are read from the environment so no real
+    // secret is committed. The defaults below are dev-only placeholders — set
+    // SEED_ADMIN_EMAIL / SEED_ADMIN_PASSWORD in the environment for production.
+    const adminEmail = process.env.SEED_ADMIN_EMAIL || 'admin@soliva.com';
+    const adminPassword = process.env.SEED_ADMIN_PASSWORD || 'SolivaAdmin!2026_secure';
+
+    await User.deleteMany({ email: adminEmail });
     const adminUser = await User.create({
       name: 'Admin User',
       username: 'admin',
-      email: 'admin@soliva.com',
-      password: 'password123',
+      email: adminEmail,
+      password: adminPassword,
       role: 'admin',
     });
 
