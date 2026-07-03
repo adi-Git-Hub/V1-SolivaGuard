@@ -11,6 +11,9 @@ RUN npm ci --omit=dev && npm cache clean --force
 
 COPY --chown=node:node . .
 
+# Create writable directories for runtime
+RUN mkdir -p logs uploads && chown -R node:node logs uploads
+
 # Use non-root user
 USER node
 

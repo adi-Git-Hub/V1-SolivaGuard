@@ -68,7 +68,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=8080
 
-COPY --from=build /app ./
+COPY --chown=node:node --from=build /app ./
 
 # Run as the built-in non-root `node` user.
 USER node
