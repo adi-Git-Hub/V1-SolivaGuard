@@ -1,18 +1,25 @@
 import { z } from "zod";
 
 function resolveApiUrl(): string {
-  const fromEnv = import.meta.env.VITE_API_URL as string | undefined;
-  if (fromEnv && fromEnv.trim()) return fromEnv.trim();
+  let url = import.meta.env.VITE_API_URL as string | undefined;
+  url = url ? url.trim() : "";
 
-  // No env configured — derive a SAME-ORIGIN base. nginx proxies /api/* to the backend,
-  // so the current origin (https://solivaguard.com in prod) already serves the API.
-  // Never hardcode a host/port here, so the bundle can't leak a localhost URL.
-  if (typeof window !== "undefined" && window.location?.origin) {
-    return `${window.location.origin}/api/v1`;
+  // If the URL is already absolute, it's safe to return. Zod will validate it.
+  if (url.startsWith("http://") || url.startsWith("https://")) {
+    return url;
   }
 
-  // Last-resort SSR fallback (no window). Production origin, never localhost.
-  return "https://solivaguard.com/api/v1";
+  // If empty or relative (e.g., "/api/v1"), determine the path
+  const path = url.startsWith("/") ? url : (url ? `/${url}` : "/api/v1");
+
+  // In the browser, use the current origin
+  if (typeof window !== "undefined" && window.location?.origin) {
+    return `${window.location.origin}${path}`;
+  }
+
+  // In SSR, Node.js fetch() requires an absolute URL.
+  // We use the Docker internal network to bypass public NAT/Nginx for performance and reliability.
+  return `http://backend:5000${path}`;
 }
 
 const envSchema = z.object({
