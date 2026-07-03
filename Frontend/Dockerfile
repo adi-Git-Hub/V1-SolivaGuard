@@ -27,6 +27,7 @@ WORKDIR /app
 # devDependencies and are required both to BUILD and to run `vite preview`,
 # so we install the full tree (no --omit=dev here).
 COPY package*.json ./
+ENV PUPPETEER_SKIP_DOWNLOAD=true
 RUN npm ci
 
 # VITE_* build-time args -> baked into the client bundle by `npm run build`.
