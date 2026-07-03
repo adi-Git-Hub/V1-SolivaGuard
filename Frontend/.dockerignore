@@ -9,7 +9,6 @@ README.md
 .lovable
 .wrangler
 bun.lock
-package-lock.json
 ._*
 
 # Never bake local secret env files into the image build context.
