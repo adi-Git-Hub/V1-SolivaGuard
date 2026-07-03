@@ -1,0 +1,121 @@
+# =============================================================================
+# Soliva — PRODUCTION compose (Hetzner: 2 vCPU / 4 GB / Ubuntu)
+# -----------------------------------------------------------------------------
+# Production PULLS pre-built images from GHCR and RUNS them. It NEVER builds.
+#     docker compose -f docker-compose.prod.yml pull
+#     docker compose -f docker-compose.prod.yml up -d
+# Images are built & pushed by GitHub Actions (.github/workflows/deploy.yml).
+#
+# Secrets live ONLY in a local `.env` next to this file on the prod box
+# (see .env.prod.example). They are NEVER committed and NEVER baked into images.
+#
+# Host nginx (already installed + certbot TLS) reverse-proxies:
+#     https://solivaguard.com/        -> 127.0.0.1:8080  (frontend SSR)
+#     https://solivaguard.com/api/*   -> 127.0.0.1:5000  (backend API)
+#
+# Rollback: set TAG=<previous-git-sha> in .env, then `pull` + `up -d` again.
+# =============================================================================
+name: soliva
+
+services:
+  backend:
+    image: ${REGISTRY:-ghcr.io/adi-git-hub}/soliva-backend:${TAG:-latest}
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # Infra wiring — overrides anything in .env so the app always points at the
+      # in-compose datastores (env_file is lower precedence than this block).
+      - NODE_ENV=production
+      - PORT=5000
+      - MONGO_URI=mongodb://${MONGO_USER}:${MONGO_PASSWORD}@mongo:27017/soliva?authSource=admin
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+    ports:
+      - "127.0.0.1:5000:5000"      # loopback only; host nginx proxies to it
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - backend-uploads:/usr/src/app/uploads   # persist uploaded images/invoices
+    networks: [soliva-network]
+    deploy:
+      resources:
+        limits:
+          cpus: "0.75"
+          memory: 640M
+
+  frontend:
+    image: ${REGISTRY:-ghcr.io/adi-git-hub}/soliva-frontend:${TAG:-latest}
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - PORT=8080
+    ports:
+      - "127.0.0.1:8080:8080"      # loopback only; host nginx proxies to it
+    depends_on:
+      - backend
+    networks: [soliva-network]
+    deploy:
+      resources:
+        limits:
+          cpus: "0.75"
+          memory: 640M
+
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
+    volumes:
+      - mongo-data:/data/db
+    ports:
+      - "127.0.0.1:27017:27017"    # loopback only (defense-in-depth)
+    networks: [soliva-network]
+    healthcheck:
+      test: ["CMD", "mongosh", "-u", "${MONGO_USER}", "-p", "${MONGO_PASSWORD}", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.75"
+          memory: 1200M
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD}", "--appendonly", "yes"]
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD}   # for the healthcheck shell below
+    volumes:
+      - redis-data:/data
+    ports:
+      - "127.0.0.1:6379:6379"      # loopback only
+    networks: [soliva-network]
+    healthcheck:
+      test: ["CMD", "sh", "-c", "redis-cli -a \"$$REDIS_PASSWORD\" ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 256M
+
+volumes:
+  mongo-data:
+  redis-data:
+  backend-uploads:
+
+networks:
+  soliva-network:
+    driver: bridge
