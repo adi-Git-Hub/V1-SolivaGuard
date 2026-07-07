@@ -19,7 +19,7 @@ name: soliva
 
 services:
   backend:
-    image: ${REGISTRY:-ghcr.io/adi-git-hub}/soliva-backend:${TAG:-latest}
+    image: ghcr.io/adi-git-hub/soliva-backend:${TAG}
     restart: unless-stopped
     env_file:
       - .env
@@ -49,7 +49,7 @@ services:
           memory: 640M
 
   frontend:
-    image: ${REGISTRY:-ghcr.io/adi-git-hub}/soliva-frontend:${TAG:-latest}
+    image: ghcr.io/adi-git-hub/soliva-frontend:${TAG}
     restart: unless-stopped
     environment:
       - NODE_ENV=production

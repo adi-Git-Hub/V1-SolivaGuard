@@ -4,6 +4,10 @@ node_modules/
 # Environment files
 .env
 .env.*
+# production.env holds REAL prod secrets and matches neither pattern above —
+# ignore it explicitly so it can never be committed.
+production.env
+*.env
 !.env.example
 !.env.prod.example
 
@@ -54,3 +58,8 @@ trace.json
 Frontend/stats-final.json
 Frontend/stats-final-v2.json
 Frontend/stats-latest.json
+
+# LaTeX build artifacts (from PROJECT_HANDOVER_DOCUMENT.tex etc.)
+*.aux
+*.out
+*.toc

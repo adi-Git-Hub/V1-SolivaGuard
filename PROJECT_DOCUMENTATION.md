@@ -430,9 +430,20 @@ The system is configured for future scalability and maintenance.
 
 ---
 
-## 14. Maintenance Scope
+## 14. Maintenance & Server Hosting Charges
 
-The recommended monthly maintenance package is priced at **₹6,000/month** and includes the following services:
+Hosting and maintenance are billed **annually**, as per the Hosting & Website Maintenance Quotation (#TAT-2026-06-28-001) and the Server Configuration & Deployment Invoice (#TAT-2026-06-29-002):
+
+| Description | Plan | Amount |
+| :--- | :--- | :--- |
+| **Annual Cloud Server Hosting** — 4 vCPU (Intel®/AMD), 8 GB RAM, 80 GB NVMe SSD | 1 Year | **₹12,000/year** (≈ ₹1,000/month, billed as a single annual payment) |
+| **Website Maintenance (Annual Plan)** | 1 Year | **₹9,600/year** |
+| Complimentary Technical Support | 30 Days | Included |
+| Daily Backup & Server Monitoring | — | Included |
+| Ubuntu Server Provisioning, Docker Environment, Nginx Reverse Proxy, SSL/DNS & Production Deployment | 1 Year | Included |
+| **Total Annual Cost** | | **₹21,600/year** |
+
+The annual maintenance plan includes the following services:
 
 *   **Server Monitoring:** Regular checks to ensure frontend and backend Systemd services are running.
 *   **Bug Fixes:** Troubleshooting and resolving runtime application errors.
@@ -490,7 +501,7 @@ The implementation of the Soliva Guard E-Commerce Platform provides significant 
 
 The Soliva Guard e-commerce platform has been successfully delivered and deployed by the technology partner. The platform runs on a self-hosted Linux server, with loopback-secured database instances and structured process logging. The administrative features provide complete control over products, inventory, customers, and order dispatch workflows. We believe the platform is ready to support your business growth.
 
-Should you wish to opt-in to the monthly maintenance program or require help with server variables, please contact our support desk.
+Should you wish to opt-in to the annual maintenance program or require help with server variables, please contact our support desk.
 
 Sincerely,  
 **TATVEIN Technologies Delivery & Integration Team**

@@ -150,6 +150,23 @@ const SECTION_OF: Record<FieldName, number> = {
   country: 2,
 };
 
+// Fields we persist so a (guest) user's details survive the login round-trip.
+// Contact fields (name / email / phone) are intentionally excluded — after login
+// they auto-fill from the account, so persisting them would risk overriding the
+// signed-in identity with whatever a guest typed.
+const DRAFT_FIELDS = [
+  "address",
+  "city",
+  "state",
+  "pinCode",
+  "country",
+  "recipientName",
+  "recipientPhone",
+  "recipientEmail",
+  "giftNote",
+  "deliveryInstructions",
+] as const;
+
 /* ════════ MOTION ════════ */
 
 const sectionReveal = {
@@ -201,7 +218,7 @@ const payTrust = [
 function CheckoutRoute() {
   const navigate = useNavigate();
   const session = useSession();
-  const { items, setItems, clear, setConfirmedOrder } = useCheckoutStore();
+  const { items, setItems, clear, setConfirmedOrder, setDraft } = useCheckoutStore();
   const createOrder = useCreateOrder();
   const verifyPayment = useVerifyPayment();
 
@@ -238,6 +255,9 @@ function CheckoutRoute() {
   const [stage, setStage] = useState<PaymentStage>("idle");
   const [payError, setPayError] = useState<string | null>(null);
   const [paymentDone, setPaymentDone] = useState(false);
+  // Set when a guest opts to pay and we send them to login — disarms the
+  // unsaved-changes guard so the redirect is instant (no "Leave this page?").
+  const [leavingForLogin, setLeavingForLogin] = useState(false);
   const [activePayment, setActivePayment] = useState<PaymentMethod | null>(null);
   const [upiId, setUpiId] = useState("");
   const [expandedSection, setExpandedSection] = useState<number>(0);
@@ -278,6 +298,41 @@ function CheckoutRoute() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.user?.id]);
 
+  // ── Draft persistence (survive the login round-trip) ──────────────────────
+  // Restore any saved draft once, on mount (in an effect — not the initial state
+  // — so the server and first client render match and we avoid hydration drift).
+  const [draftHydrated, setDraftHydrated] = useState(false);
+  useEffect(() => {
+    const d = useCheckoutStore.getState().draft;
+    if (d?.form) setForm((prev) => ({ ...prev, ...d.form }) as typeof prev);
+    if (d?.orderType === "gift" || d?.orderType === "self") setOrderType(d.orderType);
+    setDraftHydrated(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  // Persist the draft on every change — but only after the initial restore, so
+  // the empty first render never overwrites a saved draft.
+  useEffect(() => {
+    if (!draftHydrated) return;
+    const draftForm: Record<string, string> = {};
+    for (const k of DRAFT_FIELDS) draftForm[k] = form[k];
+    setDraft({ form: draftForm, orderType });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftHydrated, form, orderType]);
+
+  // Greet a user who returns to checkout right after logging in to finish a
+  // payment they began as a guest. The flag is set in handlePay before we send
+  // them to /login, and cleared here once shown (once per round-trip).
+  useEffect(() => {
+    if (!session?.user) return;
+    if (typeof window === "undefined") return;
+    if (sessionStorage.getItem("soliva.welcomeBack") === "1") {
+      sessionStorage.removeItem("soliva.welcomeBack");
+      const first = (session.user.name || "").trim().split(/\s+/)[0];
+      toast.success(first ? `Welcome back, ${first}!` : "Welcome back!");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.user?.id]);
+
   // Redirect to the success page once payment is confirmed. Runs on the render
   // AFTER paymentDone flips true, so formDirty is already false and the
   // navigation blocker no longer cancels this navigate.
@@ -289,6 +344,17 @@ function CheckoutRoute() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paymentDone]);
+
+  // Guest → login redirect. Runs from an effect (not inline in handlePay) so it
+  // fires on the render AFTER leavingForLogin flips true — by which point
+  // formDirty is false and the UnsavedChangesGuard is inert. Result: no
+  // "Leave this page?" prompt, straight to the login page.
+  useEffect(() => {
+    if (leavingForLogin) {
+      navigate({ to: "/login", search: { redirect: "/checkout" } as never });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leavingForLogin]);
 
   const upiInputRef = useRef<HTMLInputElement>(null);
 
@@ -338,6 +404,7 @@ function CheckoutRoute() {
 
   const formDirty =
     !paymentDone &&
+    !leavingForLogin &&
     [form.address, form.city, form.state, form.pinCode, form.recipientName, form.giftNote].some(
       (v) => v.trim() !== "",
     );
@@ -511,8 +578,16 @@ function CheckoutRoute() {
     if (paying) return; // prevent double orders / repeated clicks
 
     if (!session?.user) {
-      toast.message("Sign in to continue");
-      navigate({ to: "/login", search: { redirect: "/checkout" } as never });
+      // Guest hit the payment step — save their spot and send them to log in.
+      // The draft (address / order details) is already persisted; flag a warm
+      // "welcome back" for when they return. Flip leavingForLogin so the
+      // unsaved-changes guard goes inert, then the effect above redirects to
+      // login on the next render — no "Leave this page?" confirmation.
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem("soliva.welcomeBack", "1");
+      }
+      toast.error("Please login for processing payment method");
+      setLeavingForLogin(true);
       return;
     }
 

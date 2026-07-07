@@ -38,7 +38,15 @@ class AuthService {
     // ── Duplicate checks UP FRONT (at registration), so the user sees a clear
     // message here instead of a cryptic E11000 AFTER entering the OTP. ──
     const emailExists = await authRepository.findUserByEmail(normalizedEmail);
-    if (emailExists) throw new ErrorHandler('An account with this email already exists', 400);
+    if (emailExists) {
+      // This email already belongs to a Google (passwordless) account. Tell the
+      // user to sign in with Google instead of showing a generic "already exists"
+      // message — they have no password to set/enter here.
+      if (emailExists.authProvider === 'google' || emailExists.googleId) {
+        throw new ErrorHandler('This email is already registered with Google sign-in. Please use "Continue with Google" to log in.', 400);
+      }
+      throw new ErrorHandler('An account with this email already exists', 400);
+    }
 
     if (normalizedPhone) {
       const phoneExists = await authRepository.findUserByPhone(normalizedPhone);
@@ -309,6 +317,13 @@ class AuthService {
 
     if (user.isLocked) {
       throw new ErrorHandler('Account is temporarily locked', 403);
+    }
+
+    // Passwordless (Google) accounts have no stored password — comparing against
+    // it would throw a raw bcrypt "Illegal arguments: string, undefined" error.
+    // Send the user to the right sign-in method instead.
+    if (!user.password) {
+      throw new ErrorHandler('This email is registered with Google sign-in. Please use "Continue with Google" to log in.', 401);
     }
 
     const isMatch = await user.matchPassword(password);
