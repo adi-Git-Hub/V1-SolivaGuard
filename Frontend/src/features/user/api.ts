@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { env } from "@/config/env";
-import { ApiError } from "@/lib/api";
+import { ApiError, assetUrl } from "@/lib/api";
 import { sessionQueryKey } from "@/features/auth/hooks/useSession";
 
 // Avatar upload is multipart/form-data — we cannot use lib/api.ts's JSON wrapper
@@ -49,7 +49,7 @@ export function useUpdateAvatar() {
     onSuccess: (data) => {
       // Patch the session cache immediately so Avatar re-renders without a refetch.
       qc.setQueryData(sessionQueryKey, (old: any) =>
-        old ? { ...old, user: { ...old.user, avatarUrl: data.avatarUrl } } : old,
+        old ? { ...old, user: { ...old.user, avatarUrl: assetUrl(data.avatarUrl) } } : old,
       );
       // Background refetch so any other session fields stay fresh.
       qc.invalidateQueries({ queryKey: sessionQueryKey });

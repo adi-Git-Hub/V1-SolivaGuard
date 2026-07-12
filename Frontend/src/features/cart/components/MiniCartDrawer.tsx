@@ -1,11 +1,9 @@
 import { ShoppingBag, X } from "lucide-react";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { toast } from "sonner";
 
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { useCart } from "../hooks/useCart";
-import { useSession } from "@/features/auth/hooks/useSession";
 import { useCheckoutStore } from "@/features/checkout/store";
 import { useCartUIStore } from "../store";
 import { CartLineItem } from "./CartLineItem";
@@ -15,15 +13,12 @@ import { CartEmptyState } from "./CartEmptyState";
 export function MiniCartDrawer() {
   const { isOpen, closeCart } = useCartUIStore();
   const { lines } = useCart();
-  const session = useSession();
   const navigate = useNavigate();
   const setCheckoutItems = useCheckoutStore((s) => s.setItems);
 
   function onCheckout() {
-    if (!session?.user) {
-      toast.message("Sign in to continue to checkout");
-      return;
-    }
+    // Guests go straight to checkout — Contact Information there handles the
+    // silent email check and Welcome Back/Sign In branching inline.
     setCheckoutItems(
       lines.map((l) => ({
         productId: l.productId,

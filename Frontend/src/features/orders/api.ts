@@ -99,12 +99,21 @@ export function useVerifyPayment() {
   });
 }
 
+export type CancelOrderInput = {
+  orderId: string;
+  reason: string;
+  detail?: string;
+};
+
 export function useCancelOrder() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (orderId: string) =>
-      api.put<EnvelopedResponse<unknown>>(`/orders/${orderId}/cancel`),
-    onSuccess: (_data, orderId) => {
+    mutationFn: ({ orderId, reason, detail }: CancelOrderInput) =>
+      api.put<EnvelopedResponse<{ order: Order }>>(`/orders/${orderId}/cancel`, {
+        reason,
+        detail,
+      }),
+    onSuccess: (_data, { orderId }) => {
       qc.invalidateQueries({ queryKey: orderKeys.byId(orderId) });
       qc.invalidateQueries({ queryKey: orderKeys.mine() });
     },

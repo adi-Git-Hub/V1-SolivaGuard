@@ -364,6 +364,287 @@ class AuthService {
     return { user, sessionId, accessToken, refreshToken };
   }
 
+  // ── Passwordless sign-in: one email-OTP flow that both logs in a returning
+  // account (email OR Google) and auto-creates a new one. Proving ownership of
+  // the email is the only credential — so the same email always gets in, and
+  // there is no "registered with Google" dead-end. ──
+
+  // Derive a friendly display name from the email local-part for auto-created
+  // accounts (the user can change it later in their profile).
+  prettyNameFromEmail(email) {
+    const local = String(email).split('@')[0] || '';
+    const pretty = local
+      .replace(/[._+-]+/g, ' ')
+      .replace(/\d+/g, '')
+      .trim()
+      .replace(/\b\w/g, (c) => c.toUpperCase());
+    return pretty || local || 'Soliva Member';
+  }
+
+  async requestLoginOtp(email, req) {
+    const normalizedEmail = String(email).toLowerCase().trim();
+
+    // Soft resend cooldown — a stuck retry loop can't email-bomb an address.
+    const existing = await authRepository.findEmailOtp(normalizedEmail);
+    if (
+      existing &&
+      existing.lastSentAt &&
+      Date.now() - new Date(existing.lastSentAt).getTime() < 20 * 1000
+    ) {
+      // Respond as success without resending; never reveal timing or existence.
+      return { email: normalizedEmail };
+    }
+
+    const { otp, hashedOTP } = makeOTP();
+    await authRepository.upsertEmailOtp(normalizedEmail, {
+      otpHash: hashedOTP,
+      expiresAt: otpExpiryDate(),
+      attempts: 0,
+      lastSentAt: new Date(),
+    });
+
+    await authRepository.createAuditLog({
+      email: normalizedEmail,
+      action: 'otp_sent',
+      status: 'success',
+      ipHash: hashIP(req.ip),
+      device: req.headers['user-agent'],
+    });
+
+    const html = getOTPTemplate(otp, 'signin');
+    await enqueueEmail('signInOTP', {
+      email: normalizedEmail,
+      subject: 'Your Soliva sign-in code',
+      html,
+    });
+
+    // Identical response for new and returning emails (no account enumeration).
+    return { email: normalizedEmail };
+  }
+
+  async verifyLoginOtp(email, otp, req) {
+    const normalizedEmail = String(email).toLowerCase().trim();
+    const hashedOTP = crypto.createHash('sha256').update(String(otp)).digest('hex');
+    const ipHash = hashIP(req.ip);
+
+    const challenge = await authRepository.findEmailOtp(normalizedEmail);
+    if (!challenge || challenge.expiresAt < new Date()) {
+      throw new ErrorHandler('Invalid or expired code. Please request a new one.', 400);
+    }
+
+    if (challenge.attempts >= 5) {
+      await authRepository.deleteEmailOtp(normalizedEmail);
+      throw new ErrorHandler('Too many incorrect attempts. Please request a new code.', 429);
+    }
+
+    if (challenge.otpHash !== hashedOTP) {
+      await authRepository.incrementEmailOtpAttempts(normalizedEmail);
+      await authRepository.createAuditLog({
+        email: normalizedEmail,
+        action: 'otp_failed',
+        status: 'failure',
+        ipHash,
+      });
+      throw new ErrorHandler('Invalid or expired code. Please try again.', 400);
+    }
+
+    // Correct code → burn the challenge so it can never be replayed.
+    await authRepository.deleteEmailOtp(normalizedEmail);
+
+    const sessionId = crypto.randomBytes(16).toString('hex');
+    const newSession = this.generateSession(req, sessionId);
+
+    let user = await authRepository.findUserByEmail(normalizedEmail);
+
+    if (user) {
+      // Returning account (email OR Google) → sign in.
+      if (user.status === 'blocked') {
+        throw new ErrorHandler('Your account has been restricted. Please contact the admin.', 403, 'ACCOUNT_BLOCKED');
+      }
+      if (user.isLocked) throw new ErrorHandler('Account is temporarily locked', 403);
+
+      if (!user.isVerified) {
+        user.isVerified = true;
+        user.verifiedAt = new Date();
+      }
+      user.loginAttempts = 0;
+      user.lockUntil = undefined;
+      user.sessions.push(newSession);
+      this.applyLoginContext(user, req);
+      await authRepository.saveUser(user);
+
+      await authRepository.createAuditLog({
+        userId: user._id,
+        action: 'login_success',
+        status: 'success',
+        ipHash,
+        message: 'email_otp',
+      });
+    } else {
+      // New email → create a passwordless account and sign in.
+      let username = normalizedEmail.split('@')[0].toLowerCase();
+      const base = username;
+      while (await authRepository.findUserByUsername(username)) {
+        username = `${base}${crypto.randomBytes(2).toString('hex')}`;
+      }
+
+      const newUserData = {
+        name: this.prettyNameFromEmail(normalizedEmail),
+        username,
+        email: normalizedEmail,
+        authProvider: 'local',
+        isVerified: true,
+        verifiedAt: new Date(),
+        sessions: [newSession],
+      };
+      this.applyLoginContext(newUserData, req);
+      user = await authRepository.createUser(newUserData);
+
+      await authRepository.createAuditLog({
+        userId: user._id,
+        action: 'registration_initiated',
+        status: 'success',
+        ipHash,
+        message: 'email_otp_signup',
+      });
+
+      try {
+        const html = getWelcomeTemplate(user.name);
+        await enqueueEmail('welcomeEmail', {
+          email: user.email,
+          subject: 'Welcome to Soliva!',
+          html,
+        });
+      } catch (_) {
+        /* sign-in already succeeded */
+      }
+    }
+
+    this.geolocateLoginAsync(user._id, geo.getClientIp(req));
+
+    const accessToken = generateAccessToken(user._id, sessionId);
+    const refreshToken = generateRefreshToken(user._id, sessionId);
+
+    return { user, accessToken, refreshToken };
+  }
+
+  // ── Guest checkout support ──
+
+  /**
+   * Silent existence check used by the checkout flow's Contact Information
+   * step. Deliberately DOES reveal existence (unlike requestLoginOtp) — that's
+   * the point: the UI branches to "Welcome Back / Sign In" vs "Continue as
+   * guest" based on this. A 'guest' accountType is treated as "not really an
+   * account yet" so a prior guest order under this email doesn't force a
+   * sign-in prompt on a later visit.
+   */
+  async checkEmailExists(email) {
+    const normalizedEmail = String(email).toLowerCase().trim();
+    const user = await authRepository.findUserByEmail(normalizedEmail);
+    if (!user) return { exists: false, accountType: null };
+    return { exists: true, accountType: user.accountType === 'guest' ? 'guest' : 'registered' };
+  }
+
+  /**
+   * Find-or-create the account a guest order attaches to. Reuses a prior
+   * 'guest' account under the same email (order continuity); refuses to
+   * attach to a real 'registered' account — that email must go through Sign
+   * In instead (the checkout's silent email check is expected to catch this
+   * before the order is even submitted; this is the backend backstop).
+   */
+  async findOrCreateGuestUser(email, shippingInfo) {
+    const normalizedEmail = String(email).toLowerCase().trim();
+    const user = await authRepository.findUserByEmail(normalizedEmail);
+
+    if (user) {
+      if (user.accountType !== 'guest') {
+        throw new ErrorHandler('An account already exists with this email. Please sign in to continue.', 409, 'ACCOUNT_EXISTS');
+      }
+      if (user.status === 'blocked') {
+        throw new ErrorHandler('Your account has been restricted. Please contact the admin.', 403, 'ACCOUNT_BLOCKED');
+      }
+      return user;
+    }
+
+    let username = normalizedEmail.split('@')[0].toLowerCase();
+    const base = username;
+    while (await authRepository.findUserByUsername(username)) {
+      username = `${base}${crypto.randomBytes(2).toString('hex')}`;
+    }
+
+    // Only attach the phone if it's not already claimed by another account —
+    // the order's own shippingInfo snapshot keeps it either way.
+    let normalizedPhone = shippingInfo?.phone ? String(shippingInfo.phone).trim() : undefined;
+    if (normalizedPhone && (await authRepository.findUserByPhone(normalizedPhone))) {
+      normalizedPhone = undefined;
+    }
+
+    const newUserData = {
+      name: shippingInfo?.fullName || this.prettyNameFromEmail(normalizedEmail),
+      username,
+      email: normalizedEmail,
+      phoneNumber: normalizedPhone,
+      accountType: 'guest',
+      authProvider: 'local',
+      isVerified: false,
+    };
+
+    return await authRepository.createUser(newUserData);
+  }
+
+  /**
+   * Guest-to-registered conversion: set a password on a passwordless account
+   * (guest or OTP/Google-created). Gated by the same email-OTP challenge
+   * request-otp already sends — no new "send code" plumbing needed. Flips
+   * accountType to 'registered' so a later guest checkout under this email is
+   * correctly routed to Sign In instead of silently reusing the account.
+   */
+  async createPassword(email, otp, password, req) {
+    const normalizedEmail = String(email).toLowerCase().trim();
+    const hashedOTP = crypto.createHash('sha256').update(String(otp)).digest('hex');
+    const ipHash = hashIP(req.ip);
+
+    const challenge = await authRepository.findEmailOtp(normalizedEmail);
+    if (!challenge || challenge.expiresAt < new Date() || challenge.otpHash !== hashedOTP) {
+      throw new ErrorHandler('Invalid or expired code. Please request a new one.', 400);
+    }
+    await authRepository.deleteEmailOtp(normalizedEmail);
+
+    const user = await authRepository.findUserByEmail(normalizedEmail, true);
+    if (!user) {
+      throw new ErrorHandler('No account found for this email', 404);
+    }
+    if (user.password) {
+      throw new ErrorHandler('This account already has a password. Use "Forgot password" to reset it instead.', 400);
+    }
+
+    user.password = password; // hashed by the userModel pre-save hook
+    user.accountType = 'registered';
+    if (!user.isVerified) {
+      user.isVerified = true;
+      user.verifiedAt = new Date();
+    }
+
+    const sessionId = crypto.randomBytes(16).toString('hex');
+    user.sessions.push(this.generateSession(req, sessionId));
+    this.applyLoginContext(user, req);
+    await authRepository.saveUser(user);
+    this.geolocateLoginAsync(user._id, geo.getClientIp(req));
+
+    await authRepository.createAuditLog({
+      userId: user._id,
+      action: 'password_created',
+      status: 'success',
+      ipHash,
+      message: 'guest_to_registered',
+    });
+
+    const accessToken = generateAccessToken(user._id, sessionId);
+    const refreshToken = generateRefreshToken(user._id, sessionId);
+
+    return { user, accessToken, refreshToken };
+  }
+
   async refreshToken(token, req) {
     try {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
@@ -423,6 +704,122 @@ class AuthService {
       user.sessions = user.sessions.filter(s => s.sessionId === currentSessionId);
       await authRepository.saveUser(user);
     }
+  }
+
+  // ── Self-service account deletion (soft delete + anonymize) ──
+
+  /**
+   * Step 1: email a confirmation code to the logged-in user's own address.
+   * Reuses the same email-OTP challenge store as sign-in, so there's no new
+   * plumbing — the code is verified in deleteAccount below.
+   */
+  async requestAccountDeletionOtp(userId, req) {
+    const user = await authRepository.findUserById(userId);
+    if (!user) throw new ErrorHandler('User not found', 404);
+
+    const normalizedEmail = String(user.email).toLowerCase().trim();
+    const { otp, hashedOTP } = makeOTP();
+    await authRepository.upsertEmailOtp(normalizedEmail, {
+      otpHash: hashedOTP,
+      expiresAt: otpExpiryDate(),
+      attempts: 0,
+      lastSentAt: new Date(),
+    });
+
+    await authRepository.createAuditLog({
+      userId: user._id,
+      email: normalizedEmail,
+      action: 'account_deletion_initiated',
+      status: 'success',
+      ipHash: hashIP(req.ip),
+      device: req.headers['user-agent'],
+    });
+
+    const html = getOTPTemplate(otp, 'deleteAccount');
+    await enqueueEmail('accountDeletionOTP', {
+      email: normalizedEmail,
+      subject: 'Soliva - Confirm account deletion',
+      html,
+    });
+
+    return { email: normalizedEmail };
+  }
+
+  /**
+   * Step 2: verify the confirmation code, then soft-delete + anonymize the
+   * account. Personal data is scrubbed and the unique email / phone / username /
+   * googleId indexes are freed so the person can register fresh later; the user
+   * document itself is KEPT (status='deleted') so their orders, payments and
+   * refunds stay intact for accounting. Every session is wiped so they're
+   * signed out everywhere immediately.
+   */
+  async deleteAccount(userId, otp, req) {
+    const user = await authRepository.findUserById(userId);
+    if (!user) throw new ErrorHandler('User not found', 404);
+    if (user.status === 'deleted') throw new ErrorHandler('This account has already been deleted', 400);
+
+    const normalizedEmail = String(user.email).toLowerCase().trim();
+    const hashedOTP = crypto.createHash('sha256').update(String(otp)).digest('hex');
+    const ipHash = hashIP(req.ip);
+
+    const challenge = await authRepository.findEmailOtp(normalizedEmail);
+    if (!challenge || challenge.expiresAt < new Date()) {
+      throw new ErrorHandler('Invalid or expired code. Please request a new one.', 400);
+    }
+    if (challenge.attempts >= 5) {
+      await authRepository.deleteEmailOtp(normalizedEmail);
+      throw new ErrorHandler('Too many incorrect attempts. Please request a new code.', 429);
+    }
+    if (challenge.otpHash !== hashedOTP) {
+      await authRepository.incrementEmailOtpAttempts(normalizedEmail);
+      throw new ErrorHandler('Invalid or expired code. Please try again.', 400);
+    }
+    // Correct code → burn it so it can never be replayed.
+    await authRepository.deleteEmailOtp(normalizedEmail);
+
+    // Anonymize. Email/username are required + unique → set to a per-id sentinel
+    // that still passes the model's email regex. Phone/googleId are sparse-unique
+    // and optional → unset (undefined) so they're freed without colliding on null.
+    const idStr = String(user._id);
+    user.status = 'deleted';
+    user.deletedAt = new Date();
+    user.name = 'Deleted User';
+    user.email = `deleted.${idStr}@deleted.co`;
+    user.username = `deleted_${idStr}`;
+    user.phoneNumber = undefined;
+    user.googleId = undefined;
+    user.avatarUrl = null;
+    user.isVerified = false;
+    user.sessions = [];
+    user.emailOTP = undefined;
+    user.otpExpire = undefined;
+    user.forgotPasswordOTP = undefined;
+    user.forgotPasswordExpire = undefined;
+    // Scrub login telemetry.
+    user.lastLoginIP = null;
+    user.lastLoginISP = null;
+    user.lastLoginCity = null;
+    user.lastLoginState = null;
+    user.lastLoginCountry = null;
+    user.lastLatitude = null;
+    user.lastLongitude = null;
+    user.areaName = null;
+    user.subLocality = null;
+    user.locality = null;
+    user.deviceInfo = null;
+    user.browserInfo = null;
+    user.osInfo = null;
+
+    await authRepository.saveUser(user);
+
+    await authRepository.createAuditLog({
+      userId: user._id,
+      action: 'account_deleted',
+      status: 'success',
+      ipHash,
+    });
+
+    return { email: normalizedEmail };
   }
 
   /**

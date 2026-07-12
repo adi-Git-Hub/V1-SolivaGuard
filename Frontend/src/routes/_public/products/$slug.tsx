@@ -306,10 +306,6 @@ function SolivaProductDetail({ product }: { product: SolivaProduct }) {
   }
 
   function onBuyNow() {
-    if (!session?.user) {
-      toast.message("Sign in to continue");
-      return;
-    }
     if (!dbProduct) {
       toast.error("Product loading, please try again");
       return;
@@ -580,10 +576,6 @@ function ApiProductDetail({ slug }: { slug: string }) {
 
   function onBuyNow() {
     if (!product) return;
-    if (!session?.user) {
-      toast.message("Sign in to continue");
-      return;
-    }
     setCheckoutItems([
       {
         productId: product.id,

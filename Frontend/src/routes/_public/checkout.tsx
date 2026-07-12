@@ -1,6 +1,13 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { useState, useRef, Fragment, useEffect } from "react";
+import {
+  useState,
+  useRef,
+  Fragment,
+  useEffect,
+  type KeyboardEvent,
+  type ClipboardEvent,
+} from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft,
@@ -37,6 +44,8 @@ import {
 } from "lucide-react";
 
 import { useSession } from "@/features/auth/hooks/useSession";
+import { useCheckEmail, useRequestOtp, useVerifyOtp, usePublicConfig } from "@/features/auth/api";
+import { PhoneOtpDialog } from "@/features/auth/components/PhoneOtpDialog";
 import { useCheckoutStore } from "@/features/checkout/store";
 import { useCartStore } from "@/features/cart/store";
 import { useCreateOrder, useVerifyPayment } from "@/features/orders/api";
@@ -46,7 +55,11 @@ import {
   type AddressForm as SavedAddressForm,
 } from "@/features/user/components/AddressFormModal";
 import { openRazorpayCheckout } from "@/features/payments/razorpay";
-import type { RazorpayHandlerResponse } from "@/features/payments/razorpay";
+import type {
+  RazorpayHandlerResponse,
+  RazorpayOptions,
+  RazorpayPaymentInstrument,
+} from "@/features/payments/razorpay";
 import { ease, useIsMobile } from "@/design-system";
 import { TermsAndConditions } from "@/components/TermsAndConditions";
 import { PaymentProcessingOverlay } from "@/features/checkout/components/PaymentProcessingOverlay";
@@ -58,10 +71,55 @@ type OrderType = "self" | "gift";
 type PaymentMethod = "upi" | "upi-qr" | "card" | "netbanking" | "wallet";
 
 const RZP_KEY = import.meta.env.VITE_RAZORPAY_KEY_ID as string | undefined;
+// Cooldown for the inline "Sign In" code resend (Contact Information step).
+const INLINE_RESEND_SECONDS = 30;
 
 export const Route = createFileRoute("/_public/checkout")({
   component: CheckoutRoute,
 });
+
+/** True when order creation was rejected specifically because the guest email
+ *  already belongs to a registered account (backend's `ACCOUNT_EXISTS`). This
+ *  is a recognition event, not a payment failure — never routed through the
+ *  generic failure card. */
+function isAccountExistsError(err: unknown): boolean {
+  if (typeof err !== "object" || err === null) return false;
+  return (err as { code?: string }).code === "ACCOUNT_EXISTS";
+}
+
+/**
+ * Maps the payment method the customer already picked on this page to the
+ * Razorpay Standard Checkout config that opens directly on ONLY that method
+ * — every other method (and Razorpay's own method-selection screen) hidden.
+ * Verified against Razorpay's config.display docs: a single block containing
+ * a single instrument, with preferences.show_default_blocks set to false,
+ * hides every other method entirely rather than just reordering them.
+ * https://razorpay.com/docs/payments/payment-gateway/web-integration/standard/configure-payment-methods/understand-configuration/
+ */
+function razorpayMethodRestriction(method: PaymentMethod): {
+  prefillMethod: string;
+  config: NonNullable<RazorpayOptions["config"]>;
+} {
+  // "upi-qr" isn't a distinct Razorpay method — QR is a flow within "upi".
+  // Restricting the instrument's `flows` to just "qr" opens straight to the
+  // QR screen instead of the (deprecated) VPA-collect / intent sub-views.
+  const instrument: RazorpayPaymentInstrument =
+    method === "upi-qr" ? { method: "upi", flows: ["qr"] } : { method };
+  const prefillMethod = method === "upi-qr" ? "upi" : method;
+
+  return {
+    prefillMethod,
+    config: {
+      display: {
+        blocks: {
+          selected: { name: "Selected Payment Method", instruments: [instrument] },
+        },
+        sequence: ["block.selected"],
+        preferences: { show_default_blocks: false },
+      },
+    },
+  };
+}
 
 /* ════════ VALIDATION (pure helpers — drive inline field errors) ════════ */
 
@@ -92,42 +150,42 @@ function validateField(name: FieldName, value: string): string {
   switch (name) {
     case "fullName":
     case "recipientName":
-      if (!v) return "Name is required";
-      if (v.length < 2) return "Enter the full name";
-      if (!NAME_RE.test(v)) return "Letters only — no numbers or symbols";
+      if (!v) return "Full Name is required.";
+      if (v.length < 2) return "Please enter your full name.";
+      if (!NAME_RE.test(v)) return "Letters only — no numbers or symbols.";
       return "";
     case "email":
-      if (!v) return "Email is required";
-      if (!EMAIL_RE.test(v)) return "Enter a valid email address";
+      if (!v) return "Email is required.";
+      if (!EMAIL_RE.test(v)) return "Please enter a valid email address.";
       return "";
     case "recipientEmail": // optional
       if (!v) return "";
-      if (!EMAIL_RE.test(v)) return "Enter a valid email address";
+      if (!EMAIL_RE.test(v)) return "Please enter a valid email address.";
       return "";
     case "phone":
     case "recipientPhone": {
       const d = to10(value);
-      if (!d) return "Phone number is required";
-      if (!PHONE_RE.test(d)) return "Enter a valid 10-digit mobile number";
+      if (!d) return "Phone number is required.";
+      if (!PHONE_RE.test(d)) return "Phone number must contain exactly 10 digits.";
       return "";
     }
     case "address":
-      if (!v) return "Address is required";
-      if (v.length < 5) return "Enter your full street address";
+      if (!v) return "Address cannot be empty.";
+      if (v.length < 5) return "Please enter your full street address.";
       return "";
     case "city":
-      if (!v) return "City is required";
+      if (!v) return "Please enter your city.";
       return "";
     case "state":
-      if (!v) return "State is required";
+      if (!v) return "Please select a state.";
       return "";
     case "country":
-      if (!v) return "Country is required";
+      if (!v) return "Country is required.";
       return "";
     case "pinCode": {
       const d = onlyDigits(value);
-      if (!d) return "Pincode is required";
-      if (!PIN_RE.test(d)) return "Enter a valid 6-digit pincode";
+      if (!d) return "Pincode is required.";
+      if (!PIN_RE.test(d)) return "Please enter a valid Indian pincode.";
       return "";
     }
     default:
@@ -221,6 +279,9 @@ function CheckoutRoute() {
   const { items, setItems, clear, setConfirmedOrder, setDraft } = useCheckoutStore();
   const createOrder = useCreateOrder();
   const verifyPayment = useVerifyPayment();
+  const checkEmailMut = useCheckEmail();
+  const requestOtp = useRequestOtp();
+  const verifyOtp = useVerifyOtp();
 
   // ── Saved-address book integration (logged-in users) ──
   const isLoggedIn = !!session?.user;
@@ -255,9 +316,6 @@ function CheckoutRoute() {
   const [stage, setStage] = useState<PaymentStage>("idle");
   const [payError, setPayError] = useState<string | null>(null);
   const [paymentDone, setPaymentDone] = useState(false);
-  // Set when a guest opts to pay and we send them to login — disarms the
-  // unsaved-changes guard so the redirect is instant (no "Leave this page?").
-  const [leavingForLogin, setLeavingForLogin] = useState(false);
   const [activePayment, setActivePayment] = useState<PaymentMethod | null>(null);
   const [upiId, setUpiId] = useState("");
   const [expandedSection, setExpandedSection] = useState<number>(0);
@@ -267,6 +325,39 @@ function CheckoutRoute() {
   // Verified fields lock by default; user can opt to edit.
   const [editEmail, setEditEmail] = useState(false);
   const [editPhone, setEditPhone] = useState(false);
+
+  // ── Contact Information: silent email check + inline Welcome Back/Sign In ──
+  // checkedEmail/accountExists describe the LAST email the silent check ran
+  // against; the panel only shows while form.email still matches it (edit the
+  // email at all and it re-derives to hidden until the next check completes).
+  const [checkedEmail, setCheckedEmail] = useState("");
+  const [accountExists, setAccountExists] = useState(false);
+  // "email" = type a different address inside the popup; "prompt" = account
+  // recognized (Sign In / Use a different email); "otp" = enter the code.
+  const [signInStep, setSignInStep] = useState<"email" | "prompt" | "otp">("prompt");
+  // The email being typed in the popup's email-entry step, plus its inline error.
+  const [emailDraft, setEmailDraft] = useState("");
+  const [emailDraftError, setEmailDraftError] = useState("");
+  // Why the identity popup is open: "payment" resumes the purchase after verify;
+  // "change-email" just signs the user in and lets them keep editing the form.
+  const [identityMode, setIdentityMode] = useState<"payment" | "change-email">("payment");
+  const [inlineOtpDigits, setInlineOtpDigits] = useState<string[]>(["", "", "", "", "", ""]);
+  const [inlineResendTimer, setInlineResendTimer] = useState(0);
+  const inlineOtpRefs = useRef<Array<HTMLInputElement | null>>([]);
+  const inlineOtp = inlineOtpDigits.join("");
+  // Shown when a guest reaches Payment with an email that turns out to belong
+  // to an existing account — a recognition moment, not a failure. Reuses the
+  // exact same verify-by-code mechanism as the Contact Information panel.
+  const [accountFoundModalOpen, setAccountFoundModalOpen] = useState(false);
+
+  // ── Guest checkout Phone-OTP gate ──
+  // A new guest must verify their mobile before the order is placed. Stays
+  // completely dormant (and the flow is byte-identical to today) until MSG91 is
+  // configured on the backend, at which point phoneOtpEnabled flips true.
+  const { data: publicConfig } = usePublicConfig();
+  const phoneOtpEnabled = !!publicConfig?.phoneOtpEnabled;
+  const [phoneOtpVerified, setPhoneOtpVerified] = useState(false);
+  const [phoneOtpOpen, setPhoneOtpOpen] = useState(false);
 
   const [form, setForm] = useState({
     fullName: session?.user?.name ?? "",
@@ -319,19 +410,19 @@ function CheckoutRoute() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draftHydrated, form, orderType]);
 
-  // Greet a user who returns to checkout right after logging in to finish a
-  // payment they began as a guest. The flag is set in handlePay before we send
-  // them to /login, and cleared here once shown (once per round-trip).
+  // Inline sign-in (Contact Information step): auto-verify the moment all 6
+  // digits are present, and run the resend cooldown — mirrors the standalone
+  // login page's OTP UX so the two never drift apart.
   useEffect(() => {
-    if (!session?.user) return;
-    if (typeof window === "undefined") return;
-    if (sessionStorage.getItem("soliva.welcomeBack") === "1") {
-      sessionStorage.removeItem("soliva.welcomeBack");
-      const first = (session.user.name || "").trim().split(/\s+/)[0];
-      toast.success(first ? `Welcome back, ${first}!` : "Welcome back!");
-    }
+    if (signInStep === "otp" && inlineOtp.length === 6) void runInlineVerify(inlineOtp);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session?.user?.id]);
+  }, [inlineOtp, signInStep]);
+
+  useEffect(() => {
+    if (inlineResendTimer <= 0) return;
+    const id = setInterval(() => setInlineResendTimer((t) => t - 1), 1000);
+    return () => clearInterval(id);
+  }, [inlineResendTimer]);
 
   // Redirect to the success page once payment is confirmed. Runs on the render
   // AFTER paymentDone flips true, so formDirty is already false and the
@@ -347,15 +438,6 @@ function CheckoutRoute() {
 
   // Guest → login redirect. Runs from an effect (not inline in handlePay) so it
   // fires on the render AFTER leavingForLogin flips true — by which point
-  // formDirty is false and the UnsavedChangesGuard is inert. Result: no
-  // "Leave this page?" prompt, straight to the login page.
-  useEffect(() => {
-    if (leavingForLogin) {
-      navigate({ to: "/login", search: { redirect: "/checkout" } as never });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [leavingForLogin]);
-
   const upiInputRef = useRef<HTMLInputElement>(null);
 
   // A picked saved address already carries valid shipping data — so the inline
@@ -372,7 +454,8 @@ function CheckoutRoute() {
       : ["fullName", "email", "phone", ...shippingFields];
 
   const emailLocked = accountEmailVerified && !editEmail;
-  const phoneVerified = !!accountPhone;
+  // A guest's number counts as verified once it passes Phone OTP this session.
+  const phoneVerified = !!accountPhone || phoneOtpVerified;
   const phoneLocked = phoneVerified && !editPhone;
 
   function fieldOk(name: FieldName) {
@@ -393,6 +476,13 @@ function CheckoutRoute() {
   const shippingValid = addressMode === "saved" ? !!selectedAddress : manualShippingValid;
   const isReadyToPay = contactValid && recipientValid && shippingValid && !!activePayment;
 
+  // Show the inline Welcome Back/Sign In panel only while the field still
+  // holds the exact email the silent check ran against — edit it at all and
+  // this goes false until the next check resolves. Never shown once signed in.
+  const normalizedFormEmail = form.email.trim().toLowerCase();
+  const showWelcomeBack =
+    !session?.user && accountExists && !!normalizedFormEmail && normalizedFormEmail === checkedEmail;
+
   const stageLabel =
     stage === "order"
       ? "Creating secure payment session…"
@@ -404,7 +494,6 @@ function CheckoutRoute() {
 
   const formDirty =
     !paymentDone &&
-    !leavingForLogin &&
     [form.address, form.city, form.state, form.pinCode, form.recipientName, form.giftNote].some(
       (v) => v.trim() !== "",
     );
@@ -568,8 +657,177 @@ function CheckoutRoute() {
     setTimeout(() => (el as HTMLInputElement | null)?.focus(), 300);
   }
 
+  // ── Contact Information: silent email check + inline Welcome Back/Sign In ──
+
+  async function checkEmailSilently(rawEmail: string) {
+    if (session?.user) return; // already signed in — nothing to check
+    const normalized = rawEmail.trim().toLowerCase();
+    if (!EMAIL_RE.test(normalized) || normalized === checkedEmail) return;
+    try {
+      const result = await checkEmailMut.mutateAsync(normalized);
+      setCheckedEmail(normalized);
+      setAccountExists(result.exists && result.accountType === "registered");
+      setSignInStep("prompt");
+    } catch {
+      // Silent by design — a failed check must never block checkout.
+    }
+  }
+
+  async function handleStartInlineSignIn() {
+    try {
+      await requestOtp.mutateAsync(checkedEmail);
+      setSignInStep("otp");
+      setInlineOtpDigits(["", "", "", "", "", ""]);
+      setInlineResendTimer(INLINE_RESEND_SECONDS);
+      toast.success(`We sent a sign-in code to ${checkedEmail}`);
+      setTimeout(() => inlineOtpRefs.current[0]?.focus(), 120);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not send the code");
+    }
+  }
+
+  // Open the identity popup on its email-entry step so the user types a
+  // different email INSIDE the popup (never back in the checkout form). Used by
+  // the inline Welcome Back panel — always in "change-email" mode, so verifying
+  // just signs them in and lets them keep going (no auto-resume payment).
+  function handleUseAnotherEmail() {
+    setIdentityMode("change-email");
+    openChangeEmail();
+    setAccountFoundModalOpen(true);
+  }
+
+  // Reset the popup to a blank email-entry step. Does NOT touch identityMode —
+  // callers decide the mode (payment vs change-email) before opening.
+  function openChangeEmail() {
+    setEmailDraft("");
+    setEmailDraftError("");
+    setInlineOtpDigits(["", "", "", "", "", ""]);
+    setInlineResendTimer(0);
+    setSignInStep("email");
+  }
+
+  // "Use a different email" tapped INSIDE the popup (prompt or otp step). Stay
+  // in the same popup and switch to the email-entry step. identityMode is left
+  // as-is: from the Payment recognition modal it stays "payment" so a successful
+  // verify still resumes the purchase.
+  function handleUseDifferentEmailInModal() {
+    openChangeEmail();
+  }
+
+  // Send a code to whatever email the user typed in the popup, then advance to
+  // the OTP step — same popup. "Always verify": every email (new or existing)
+  // goes through a code before checkout continues.
+  async function submitIdentityEmail() {
+    const normalized = emailDraft.trim().toLowerCase();
+    const err = validateField("email", emailDraft);
+    if (err) {
+      setEmailDraftError(err);
+      return;
+    }
+    try {
+      await requestOtp.mutateAsync(normalized);
+      setCheckedEmail(normalized);
+      setField("email", normalized); // keep the form / prefill in sync
+      setInlineOtpDigits(["", "", "", "", "", ""]);
+      setInlineResendTimer(INLINE_RESEND_SECONDS);
+      setSignInStep("otp");
+      toast.success(`We sent a code to ${normalized}`);
+      setTimeout(() => inlineOtpRefs.current[0]?.focus(), 120);
+    } catch (err) {
+      setEmailDraftError(err instanceof Error ? err.message : "Could not send the code");
+    }
+  }
+
+  // Plain dismiss (backdrop click) — just closes the modal, no reset. Tapping
+  // Pay again re-opens it from the same state if the email is unchanged.
+  function closeAccountFoundModal() {
+    setAccountFoundModalOpen(false);
+  }
+
+  async function resendInlineCode() {
+    if (inlineResendTimer > 0 || requestOtp.isPending) return;
+    try {
+      await requestOtp.mutateAsync(checkedEmail);
+      setInlineOtpDigits(["", "", "", "", "", ""]);
+      setInlineResendTimer(INLINE_RESEND_SECONDS);
+      inlineOtpRefs.current[0]?.focus();
+      toast.success("New code sent");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not resend the code");
+    }
+  }
+
+  async function runInlineVerify(code: string) {
+    if (code.length !== 6 || verifyOtp.isPending) return;
+    try {
+      const { user } = await verifyOtp.mutateAsync({ email: checkedEmail, otp: code });
+      const first = (user.name || "").trim().split(/\s+/)[0];
+      if (accountFoundModalOpen) {
+        setAccountFoundModalOpen(false);
+        setAccountExists(false);
+        if (identityMode === "payment") {
+          // Payment-step recognition: resume the purchase automatically — the
+          // customer never has to re-initiate payment.
+          toast.success(first ? `You're in, ${first} — resuming checkout…` : "You're in — resuming checkout…");
+          setTimeout(() => void handlePay(), 300);
+        } else {
+          // Changed email from the Contact step: just sign in and let them keep
+          // filling the form — do NOT auto-charge.
+          toast.success(first ? `You're in, ${first}!` : "You're in!");
+        }
+      } else {
+        toast.success(first ? `Welcome back, ${first}!` : "Welcome back!");
+        setAccountExists(false); // session now exists — the panel hides itself
+      }
+    } catch (err) {
+      setInlineOtpDigits(["", "", "", "", "", ""]);
+      inlineOtpRefs.current[0]?.focus();
+      toast.error(err instanceof Error ? err.message : "That code didn't work — please try again.");
+    }
+  }
+
+  function setInlineDigit(i: number, value: string) {
+    const char = value.replace(/\D/g, "").slice(-1);
+    setInlineOtpDigits((prev) => {
+      const next = [...prev];
+      next[i] = char;
+      return next;
+    });
+    if (char && i < 5) inlineOtpRefs.current[i + 1]?.focus();
+  }
+
+  function onInlineOtpKeyDown(i: number, e: KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Backspace" && !inlineOtpDigits[i] && i > 0) {
+      inlineOtpRefs.current[i - 1]?.focus();
+    }
+  }
+
+  function onInlineOtpPaste(e: ClipboardEvent<HTMLInputElement>) {
+    e.preventDefault();
+    const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+    if (!pasted) return;
+    const next = ["", "", "", "", "", ""];
+    pasted.split("").forEach((d, idx) => (next[idx] = d));
+    setInlineOtpDigits(next);
+    inlineOtpRefs.current[Math.min(pasted.length, 5)]?.focus();
+  }
+
   function handlePayFailure(err: unknown) {
-    const msg = err instanceof Error ? err.message : "Payment could not be completed";
+    let msg = "An unknown error occurred. Please try again.";
+    
+    if (err instanceof Error) {
+      const eMsg = err.message.toLowerCase();
+      if (eMsg.includes("network") || eMsg.includes("failed to fetch")) {
+        msg = "Network error. Please check your internet connection.";
+      } else if (eMsg.includes("timeout")) {
+        msg = "Request timed out. Please try again.";
+      } else if (eMsg.includes("server") || eMsg.includes("500")) {
+        msg = "Server error. Please try again later.";
+      } else {
+        msg = err.message;
+      }
+    }
+    
     setStage("failed");
     setPayError(msg);
   }
@@ -577,19 +835,10 @@ function CheckoutRoute() {
   async function handlePay() {
     if (paying) return; // prevent double orders / repeated clicks
 
-    if (!session?.user) {
-      // Guest hit the payment step — save their spot and send them to log in.
-      // The draft (address / order details) is already persisted; flag a warm
-      // "welcome back" for when they return. Flip leavingForLogin so the
-      // unsaved-changes guard goes inert, then the effect above redirects to
-      // login on the next render — no "Leave this page?" confirmation.
-      if (typeof window !== "undefined") {
-        sessionStorage.setItem("soliva.welcomeBack", "1");
-      }
-      toast.error("Please login for processing payment method");
-      setLeavingForLogin(true);
-      return;
-    }
+    // Guests pay directly — no forced login. If this email turns out to
+    // belong to an existing account, order creation rejects with
+    // ACCOUNT_EXISTS — caught below and shown as the recognition modal
+    // (AccountFoundModal), never as a payment failure.
 
     // Phase 5/9 — inline validation, NO blocking popup. Surface every field
     // error at once, expand the offending section, and focus the first issue.
@@ -610,6 +859,7 @@ function CheckoutRoute() {
     });
     const firstInvalid = requiredFields.find((f) => nextErrors[f]);
     if (firstInvalid) {
+      toast.error("Please correct the highlighted fields before continuing.");
       setExpandedSection(SECTION_OF[firstInvalid]);
       focusField(firstInvalid);
       return;
@@ -617,6 +867,13 @@ function CheckoutRoute() {
     if (!activePayment) {
       setExpandedSection(3);
       toast.error("Select a payment method");
+      return;
+    }
+    // Guest checkout: require a Phone-OTP-verified mobile before placing the
+    // order. Opens the verification dialog; on success it re-invokes handlePay
+    // to resume the purchase. Dormant until MSG91 is configured.
+    if (!session?.user && phoneOtpEnabled && !phoneOtpVerified) {
+      setPhoneOtpOpen(true);
       return;
     }
     if (!RZP_KEY) {
@@ -684,6 +941,9 @@ function CheckoutRoute() {
           };
 
       const payload = {
+        // Guest checkout only — the account this order attaches to. Omitted
+        // for a logged-in session; the backend ignores it either way.
+        ...(session?.user ? {} : { guestEmail: form.email.trim().toLowerCase() }),
         shippingInfo: {
           ...shippingInfo,
           // legacy mirrors
@@ -715,11 +975,16 @@ function CheckoutRoute() {
       const { razorpayOrderId, amount } = res;
       const orderId = res.order.id ?? res.order._id;
 
-      const prefill: Record<string, string> = {
+      // Restricts the Razorpay modal to ONLY the method already chosen on this
+      // page — no re-selection screen. See razorpayMethodRestriction above.
+      const methodRestriction = activePayment ? razorpayMethodRestriction(activePayment) : null;
+
+      const prefill: NonNullable<RazorpayOptions["prefill"]> = {
         name: snapName || form.fullName,
         email: form.email,
         contact: snapPhone,
       };
+      if (methodRestriction) prefill.method = methodRestriction.prefillMethod;
       if (activePayment === "upi" && upiId) prefill.vpa = upiId;
 
       const options = {
@@ -732,6 +997,7 @@ function CheckoutRoute() {
         name: "Soliva",
         description: items.map((i) => i.name).join(", "),
         order_id: razorpayOrderId,
+        ...(methodRestriction ? { config: methodRestriction.config } : {}),
         handler: async (response: RazorpayHandlerResponse) => {
           setStage("verify");
           try {
@@ -774,7 +1040,17 @@ function CheckoutRoute() {
       setStage("connect");
       await openRazorpayCheckout(options);
     } catch (err) {
-      handlePayFailure(err);
+      if (isAccountExistsError(err)) {
+        // Not a payment failure — this email belongs to an existing account.
+        // Recognition, not an error: surface the dedicated modal instead.
+        setStage("idle");
+        setIdentityMode("payment");
+        setCheckedEmail(normalizedFormEmail);
+        setSignInStep("prompt");
+        setAccountFoundModalOpen(true);
+      } else {
+        handlePayFailure(err);
+      }
     } finally {
       setPaying(false);
     }
@@ -895,7 +1171,10 @@ function CheckoutRoute() {
                             type="email"
                             value={form.email}
                             onChange={(v) => setField("email", v)}
-                            onBlur={() => blurField("email")}
+                            onBlur={() => {
+                              blurField("email");
+                              void checkEmailSilently(form.email);
+                            }}
                             error={touched.email ? errors.email : ""}
                             placeholder="you@email.com"
                             verified={accountEmailVerified}
@@ -909,7 +1188,11 @@ function CheckoutRoute() {
                             type="tel"
                             inputMode="numeric"
                             value={form.phone}
-                            onChange={(v) => setField("phone", to10(v) || onlyDigits(v).slice(0, 10))}
+                            onChange={(v) => {
+                              setField("phone", to10(v) || onlyDigits(v).slice(0, 10));
+                              // Editing the number invalidates a prior verification.
+                              if (phoneOtpVerified) setPhoneOtpVerified(false);
+                            }}
                             onBlur={() => blurField("phone")}
                             error={touched.phone ? errors.phone : ""}
                             placeholder="9876543210"
@@ -919,6 +1202,99 @@ function CheckoutRoute() {
                             onEdit={() => setEditPhone(true)}
                           />
                         </div>
+
+                        {/* Silent email check → Welcome Back / Sign In / Use Another Email.
+                            Purely additive — never blocks Continue, never navigates away. */}
+                        <AnimatePresence initial={false}>
+                          {showWelcomeBack && (
+                            <Expand>
+                              <div className="rounded-2xl border border-orange-glow/25 bg-orange-glow/[0.06] p-5 sm:p-6">
+                                <AnimatePresence mode="wait" initial={false}>
+                                  {signInStep !== "otp" ? (
+                                    <motion.div
+                                      key="prompt"
+                                      initial={{ opacity: 0, x: -8 }}
+                                      animate={{ opacity: 1, x: 0 }}
+                                      exit={{ opacity: 0, x: -8 }}
+                                      transition={{ duration: 0.3, ease: ease.luxe }}
+                                    >
+                                      <div className="flex items-start gap-3">
+                                        <div className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full bg-orange-glow/15 text-orange-glow">
+                                          <BadgeCheck className="h-4 w-4" />
+                                        </div>
+                                        <div className="min-w-0">
+                                          <p className="font-display text-[1.05rem] text-brown-deep">Welcome back!</p>
+                                          <p className="mt-1 text-[0.85rem] font-light leading-relaxed text-ink-muted">
+                                            This email already has a Soliva account.
+                                          </p>
+                                        </div>
+                                      </div>
+                                      <div className="mt-4 flex flex-col sm:flex-row gap-3">
+                                        <button
+                                          type="button"
+                                          onClick={handleStartInlineSignIn}
+                                          disabled={requestOtp.isPending}
+                                          className="flex-1 rounded-2xl bg-gradient-to-b from-[#4a3a32] to-[#3a2a22] py-3 text-white font-mono text-micro-sm tracking-cta uppercase font-bold shadow-[0_8px_22px_-12px_rgba(58,42,34,0.5)] hover:shadow-[0_12px_30px_-12px_rgba(58,42,34,0.55)] transition-all duration-500 disabled:opacity-60"
+                                        >
+                                          {requestOtp.isPending ? "Sending Code…" : "Sign In"}
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={handleUseAnotherEmail}
+                                          className="flex-1 rounded-2xl border border-[#3a2a22]/15 bg-white/70 py-3 font-mono text-micro-sm tracking-cta uppercase font-bold text-brown-deep hover:bg-white transition-all duration-500"
+                                        >
+                                          Use Another Email
+                                        </button>
+                                      </div>
+                                    </motion.div>
+                                  ) : (
+                                    <motion.div
+                                      key="otp"
+                                      initial={{ opacity: 0, x: 8 }}
+                                      animate={{ opacity: 1, x: 0 }}
+                                      exit={{ opacity: 0, x: 8 }}
+                                      transition={{ duration: 0.3, ease: ease.luxe }}
+                                    >
+                                      <p className="font-display text-[1.05rem] text-brown-deep">Enter Your Code</p>
+                                      <p className="mt-1 text-[0.85rem] font-light text-ink-muted">
+                                        We sent a 6-digit code to{" "}
+                                        <span className="font-medium text-brown-deep">{checkedEmail}</span>
+                                      </p>
+                                      <div className="mt-4">
+                                        <OtpDigitRow
+                                          digits={inlineOtpDigits}
+                                          refs={inlineOtpRefs}
+                                          onChange={setInlineDigit}
+                                          onKeyDown={onInlineOtpKeyDown}
+                                          onPaste={onInlineOtpPaste}
+                                          disabled={verifyOtp.isPending}
+                                        />
+                                      </div>
+                                      <div className="mt-4 flex items-center justify-between">
+                                        <button
+                                          type="button"
+                                          onClick={handleUseAnotherEmail}
+                                          className="text-[0.78rem] font-light text-ink-muted hover:text-brown-deep transition-colors"
+                                        >
+                                          ← Use another email
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={resendInlineCode}
+                                          disabled={inlineResendTimer > 0 || requestOtp.isPending}
+                                          className="font-mono text-[0.68rem] uppercase tracking-cta font-bold text-orange-glow transition-colors disabled:text-ink-muted/40"
+                                        >
+                                          {inlineResendTimer > 0 ? `Resend in ${inlineResendTimer}s` : "Resend Code"}
+                                        </button>
+                                      </div>
+                                    </motion.div>
+                                  )}
+                                </AnimatePresence>
+                              </div>
+                            </Expand>
+                          )}
+                        </AnimatePresence>
+
                         <ContinueButton
                           disabled={!contactValid}
                           label="Continue"
@@ -1607,6 +1983,49 @@ function CheckoutRoute() {
         onClose={() => setStage("idle")}
       />
 
+      {/* Account recognized at Payment — not a failure. Resumes checkout
+          automatically once verified. */}
+      <AccountFoundModal
+        open={accountFoundModalOpen}
+        email={checkedEmail}
+        step={signInStep}
+        emailValue={emailDraft}
+        emailError={emailDraftError}
+        onEmailChange={(v) => {
+          setEmailDraft(v);
+          if (emailDraftError) setEmailDraftError("");
+        }}
+        onSubmitEmail={submitIdentityEmail}
+        otpDigits={inlineOtpDigits}
+        otpRefs={inlineOtpRefs}
+        resendTimer={inlineResendTimer}
+        sending={requestOtp.isPending}
+        verifying={verifyOtp.isPending}
+        onSignIn={handleStartInlineSignIn}
+        onResend={resendInlineCode}
+        onDigitChange={setInlineDigit}
+        onDigitKeyDown={onInlineOtpKeyDown}
+        onDigitPaste={onInlineOtpPaste}
+        onUseDifferentEmail={handleUseDifferentEmailInModal}
+        onClose={closeAccountFoundModal}
+      />
+
+      {/* Guest checkout mobile verification — gates order placement. On success
+          it flips the number to verified and resumes the purchase. */}
+      <PhoneOtpDialog
+        open={phoneOtpOpen}
+        phone={form.phone}
+        purpose="verify"
+        title="Verify your mobile"
+        onClose={() => setPhoneOtpOpen(false)}
+        onVerified={() => {
+          setPhoneOtpVerified(true);
+          setPhoneOtpOpen(false);
+          // Resume checkout now that the number is verified.
+          setTimeout(() => void handlePay(), 300);
+        }}
+      />
+
       <UnsavedChangesGuard when={formDirty} />
 
       {/* Add a new address without leaving checkout */}
@@ -2027,6 +2446,256 @@ function PaymentMethodCard({
       </p>
       <p className="text-micro-xs text-ink-muted/50 font-mono mt-0.5">{method.sub}</p>
     </motion.button>
+  );
+}
+
+// Shared 6-box code entry — used by both the Contact Information panel and
+// AccountFoundModal so the two never visually drift apart.
+function OtpDigitRow({
+  digits,
+  refs,
+  onChange,
+  onKeyDown,
+  onPaste,
+  disabled,
+}: {
+  digits: string[];
+  refs: React.MutableRefObject<Array<HTMLInputElement | null>>;
+  onChange: (i: number, value: string) => void;
+  onKeyDown: (i: number, e: KeyboardEvent<HTMLInputElement>) => void;
+  onPaste: (e: ClipboardEvent<HTMLInputElement>) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="flex justify-center gap-2 sm:gap-3">
+      {digits.map((d, i) => (
+        <input
+          key={i}
+          ref={(el) => {
+            refs.current[i] = el;
+          }}
+          value={d}
+          onChange={(e) => onChange(i, e.target.value)}
+          onKeyDown={(e) => onKeyDown(i, e)}
+          onPaste={onPaste}
+          inputMode="numeric"
+          maxLength={1}
+          disabled={disabled}
+          className="h-12 w-full max-w-[3rem] rounded-xl border border-[#3a2a22]/[0.12] bg-white text-center text-lg font-mono text-brown-deep focus:outline-none focus:border-orange-glow/50 focus:shadow-[0_0_0_4px_rgba(245,130,13,0.09)] transition-all duration-300 disabled:opacity-60"
+        />
+      ))}
+    </div>
+  );
+}
+
+// Shown when a guest reaches Payment with an email that turns out to belong to
+// an existing account. This is a recognition event, not an error — no red,
+// no "failed" language, single primary action, checkout resumes automatically
+// once verified.
+function AccountFoundModal({
+  open,
+  email,
+  step,
+  emailValue,
+  emailError,
+  onEmailChange,
+  onSubmitEmail,
+  otpDigits,
+  otpRefs,
+  resendTimer,
+  sending,
+  verifying,
+  onSignIn,
+  onResend,
+  onDigitChange,
+  onDigitKeyDown,
+  onDigitPaste,
+  onUseDifferentEmail,
+  onClose,
+}: {
+  open: boolean;
+  email: string;
+  step: "email" | "prompt" | "otp";
+  emailValue: string;
+  emailError: string;
+  onEmailChange: (value: string) => void;
+  onSubmitEmail: () => void;
+  otpDigits: string[];
+  otpRefs: React.MutableRefObject<Array<HTMLInputElement | null>>;
+  resendTimer: number;
+  sending: boolean;
+  verifying: boolean;
+  onSignIn: () => void;
+  onResend: () => void;
+  onDigitChange: (i: number, value: string) => void;
+  onDigitKeyDown: (i: number, e: KeyboardEvent<HTMLInputElement>) => void;
+  onDigitPaste: (e: ClipboardEvent<HTMLInputElement>) => void;
+  onUseDifferentEmail: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          role="dialog"
+          aria-live="polite"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.25 }}
+          className="fixed inset-0 z-[1000] grid place-items-center p-5"
+        >
+          <div className="absolute inset-0 bg-[#3a2a22]/55 backdrop-blur-sm" onClick={onClose} />
+          <motion.div
+            initial={{ opacity: 0, y: 16, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 12, scale: 0.98 }}
+            transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+            className="relative w-full max-w-[420px] rounded-[26px] border border-black/5 bg-[#FAF7F3] p-8 text-center shadow-[0_30px_80px_-30px_rgba(58,42,34,0.55)]"
+          >
+            <div className="mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-orange-glow/12 text-orange-glow">
+              <BadgeCheck size={26} strokeWidth={2} />
+            </div>
+
+            <AnimatePresence mode="wait" initial={false}>
+              {step === "email" ? (
+                <motion.div
+                  key="email"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <h3 className="font-display text-2xl tracking-tight text-[#3a2a22]">Use a different email</h3>
+                  <p className="mx-auto mt-2.5 max-w-[320px] text-[0.92rem] font-light leading-relaxed text-[#7b6a5f]">
+                    Enter your email and we'll send you a 6-digit code to verify it.
+                  </p>
+
+                  <div className="mt-6 text-left">
+                    <input
+                      type="email"
+                      inputMode="email"
+                      autoFocus
+                      value={emailValue}
+                      onChange={(e) => onEmailChange(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          onSubmitEmail();
+                        }
+                      }}
+                      placeholder="you@email.com"
+                      className="w-full rounded-2xl border border-[#3a2a22]/[0.12] bg-white px-4 py-3.5 text-[0.95rem] text-brown-deep placeholder:text-ink-muted/50 focus:outline-none focus:border-orange-glow/50 focus:shadow-[0_0_0_4px_rgba(245,130,13,0.09)] transition-all duration-300"
+                    />
+                    {emailError && (
+                      <p className="mt-2 text-[0.78rem] font-light text-red-500">{emailError}</p>
+                    )}
+                  </div>
+
+                  <div className="mt-6 space-y-3">
+                    <button
+                      onClick={onSubmitEmail}
+                      disabled={sending}
+                      className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-b from-[#4a3a32] to-[#3a2a22] py-4 text-white font-mono text-micro-sm tracking-cta uppercase font-bold shadow-[0_10px_28px_-12px_rgba(58,42,34,0.5)] transition-all duration-500 hover:shadow-[0_16px_40px_-12px_rgba(58,42,34,0.55)] disabled:opacity-70"
+                    >
+                      {sending ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" /> Sending Code…
+                        </>
+                      ) : (
+                        "Send Code"
+                      )}
+                    </button>
+                    <button
+                      onClick={onClose}
+                      className="w-full py-1 text-[0.8rem] font-light text-ink-muted transition-colors hover:text-brown-deep"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </motion.div>
+              ) : step === "prompt" ? (
+                <motion.div
+                  key="prompt"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <h3 className="font-display text-2xl tracking-tight text-[#3a2a22]">Almost there</h3>
+                  <p className="mx-auto mt-2.5 max-w-[320px] text-[0.92rem] font-light leading-relaxed text-[#7b6a5f]">
+                    We found an existing Soliva account for this email. Sign in to continue with your saved details.
+                  </p>
+
+                  <div className="mt-7 space-y-3">
+                    <button
+                      onClick={onSignIn}
+                      disabled={sending}
+                      className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-b from-[#4a3a32] to-[#3a2a22] py-4 text-white font-mono text-micro-sm tracking-cta uppercase font-bold shadow-[0_10px_28px_-12px_rgba(58,42,34,0.5)] transition-all duration-500 hover:shadow-[0_16px_40px_-12px_rgba(58,42,34,0.55)] disabled:opacity-70"
+                    >
+                      {sending ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" /> Sending Code…
+                        </>
+                      ) : (
+                        "Sign In & Continue"
+                      )}
+                    </button>
+                    <button
+                      onClick={onUseDifferentEmail}
+                      className="w-full py-1 text-[0.8rem] font-light text-ink-muted transition-colors hover:text-brown-deep"
+                    >
+                      Use a different email
+                    </button>
+                  </div>
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="otp"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <h3 className="font-display text-2xl tracking-tight text-[#3a2a22]">Check your email</h3>
+                  <p className="mx-auto mt-2.5 max-w-[320px] text-[0.92rem] font-light leading-relaxed text-[#7b6a5f]">
+                    Enter the code we just sent to <span className="font-medium text-brown-deep">{email}</span> and
+                    we'll pick up right where you left off.
+                  </p>
+
+                  <div className="mt-6">
+                    <OtpDigitRow
+                      digits={otpDigits}
+                      refs={otpRefs}
+                      onChange={onDigitChange}
+                      onKeyDown={onDigitKeyDown}
+                      onPaste={onDigitPaste}
+                      disabled={verifying}
+                    />
+                  </div>
+
+                  <div className="mt-5 flex items-center justify-between px-1">
+                    <button
+                      onClick={onUseDifferentEmail}
+                      className="text-[0.78rem] font-light text-ink-muted transition-colors hover:text-brown-deep"
+                    >
+                      Use a different email
+                    </button>
+                    <button
+                      onClick={onResend}
+                      disabled={resendTimer > 0 || sending}
+                      className="font-mono text-[0.68rem] uppercase tracking-cta font-bold text-orange-glow transition-colors disabled:text-ink-muted/40"
+                    >
+                      {resendTimer > 0 ? `Resend in ${resendTimer}s` : "Resend Code"}
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }
 

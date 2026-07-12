@@ -28,13 +28,20 @@ import {
   Truck,
   FileText,
   Receipt,
+  Plus,
 } from "lucide-react";
 import { OutdoorIntelligence } from "@/features/weather/OutdoorIntelligence";
 import { AddressesTab } from "@/features/user/components/AddressesTab";
+import { DeleteAccountSection } from "@/features/user/components/DeleteAccountSection";
 import { useSession } from "@/features/auth/hooks/useSession";
-import { useLogout } from "@/features/auth/api";
+import { useLogout, usePublicConfig, useUpdatePhone } from "@/features/auth/api";
+import { PhoneOtpDialog } from "@/features/auth/components/PhoneOtpDialog";
 import { useRemoveAvatar, useUpdateAvatar } from "@/features/user/api";
 import { useMyOrders, documentUrl } from "@/features/orders/api";
+import { OrderStatusBadge } from "@/features/orders/components/OrderStatusBadge";
+import { OrderCancellation } from "@/features/orders/components/OrderCancellation";
+import { OrderDetailModal } from "@/features/orders/components/OrderDetailModal";
+import type { Order } from "@/features/orders/schema";
 import { useAddresses } from "@/features/user/profile-api";
 import { Avatar } from "@/components/shared/Avatar";
 import { Button } from "@/components/ui/button";
@@ -48,17 +55,6 @@ export const Route = createFileRoute("/_public/profile")({
 
 type Tab = "overview" | "orders" | "wishlist" | "addresses" | "settings";
 
-const statusTone: Record<string, string> = {
-  delivered: "text-emerald-600 bg-emerald-500/10 border-emerald-500/20",
-  shipped: "text-sky-600 bg-sky-500/10 border-sky-500/20",
-  packed: "text-sky-600 bg-sky-500/10 border-sky-500/20",
-  paid: "text-orange-glow bg-orange-glow/10 border-orange-glow/20",
-  confirmed: "text-orange-glow bg-orange-glow/10 border-orange-glow/20",
-  pending: "text-amber-600 bg-amber-500/10 border-amber-500/20",
-  cancelled: "text-red-500 bg-red-500/10 border-red-500/20",
-  refunded: "text-ink-muted bg-ink-muted/10 border-line-soft",
-};
-
 function fmtINR(n: number) {
   return `₹${Math.round(n).toLocaleString("en-IN")}`;
 }
@@ -71,11 +67,29 @@ function safeDate(iso?: string | null, pattern = "dd MMM yyyy") {
   }
 }
 
+// Order item images are product assets served from the storefront origin. Older
+// orders stored an absolute URL with a dev host or http:// (mixed-content-blocked
+// on an HTTPS mobile page). Reduce any absolute URL to its root-relative path so
+// the browser always loads it from the current origin.
+function orderImageUrl(src?: string): string | undefined {
+  if (!src) return undefined;
+  if (/^https?:\/\//i.test(src)) {
+    try {
+      return new URL(src).pathname;
+    } catch {
+      return src;
+    }
+  }
+  return src;
+}
+
 function ProfilePage() {
   const session = useSession();
   const navigate = useNavigate();
   const logout = useLogout();
   const [activeTab, setActiveTab] = useState<Tab>("overview");
+  // Order whose full details are shown in the popup (null = closed).
+  const [detailOrder, setDetailOrder] = useState<Order | null>(null);
   const contentRef = useRef<HTMLElement>(null);
 
   const switchTab = useCallback((tab: Tab) => {
@@ -109,6 +123,15 @@ function ProfilePage() {
   const removeAvatar = useRemoveAvatar();
   // Local object-URL preview — shows the picked image instantly before the upload completes.
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+
+  // Phone-change (Phone OTP verified). phoneDraft === null means "unchanged".
+  const { data: publicConfig } = usePublicConfig();
+  const phoneOtpEnabled = !!publicConfig?.phoneOtpEnabled;
+  const updatePhone = useUpdatePhone();
+  const [phoneDraft, setPhoneDraft] = useState<string | null>(null);
+  const [phoneDialogOpen, setPhoneDialogOpen] = useState(false);
+  // Overview "add phone" flow (collects number → OTP → saves).
+  const [addPhoneOpen, setAddPhoneOpen] = useState(false);
 
   async function onAvatarPicked(file: File | undefined) {
     if (!file) return;
@@ -145,13 +168,39 @@ function ProfilePage() {
   const user = session.user;
   const emailVerified = !!user.isVerified;
   const hasPhone = !!user.phoneNumber;
+
+  // Phone-change gating: only surface "Verify & save" for a valid, changed number.
+  const currentPhone10 = (user.phoneNumber ?? "").replace(/\D/g, "").slice(-10);
+  const phoneField = phoneDraft ?? user.phoneNumber ?? "";
+  const phoneDraft10 = phoneField.replace(/\D/g, "").slice(-10);
+  const phoneDraftValid = /^[6-9]\d{9}$/.test(phoneDraft10);
+  const phoneChanged = phoneDraft10 !== currentPhone10;
   const defaultAddress = addresses.find((a) => a.isDefault) ?? addresses[0];
   const location = defaultAddress ? [defaultAddress.city, defaultAddress.state].filter(Boolean).join(", ") : "—";
 
   // Security score — real, weighted from actual account state.
-  const securityChecks = [
-    { label: "Email verified", ok: emailVerified, weight: 30 },
-    { label: "Phone number added", ok: hasPhone, weight: 25 },
+  const securityChecks: {
+    label: string;
+    ok: boolean;
+    weight: number;
+    action?: () => void;
+    actionLabel?: string;
+    hint?: string;
+  }[] = [
+    {
+      label: "Email verified",
+      ok: emailVerified,
+      weight: 30,
+      hint: emailVerified ? undefined : "Sign in with your email code to verify it.",
+    },
+    {
+      label: "Phone number added",
+      ok: hasPhone,
+      weight: 25,
+      action: !hasPhone && phoneOtpEnabled ? () => setAddPhoneOpen(true) : undefined,
+      actionLabel: "Add & verify",
+      hint: !hasPhone && !phoneOtpEnabled ? "Add your number in Settings." : undefined,
+    },
     { label: "Password protected", ok: true, weight: 25 },
     { label: "Active session secured", ok: true, weight: 20 },
   ];
@@ -365,7 +414,20 @@ function ProfilePage() {
                         <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4">
                           <InfoRow icon={User} label="Name" value={user.name} />
                           <InfoRow icon={Mail} label="Email" value={user.email} verified={emailVerified} />
-                          <InfoRow icon={Phone} label="Phone" value={user.phoneNumber || "Not added"} verified={hasPhone} />
+                          {hasPhone ? (
+                            <InfoRow icon={Phone} label="Phone" value={user.phoneNumber as string} verified />
+                          ) : (
+                            <InfoRow
+                              icon={Phone}
+                              label="Phone"
+                              value="Not added"
+                              action={
+                                phoneOtpEnabled
+                                  ? { label: "Add phone number", onClick: () => setAddPhoneOpen(true) }
+                                  : undefined
+                              }
+                            />
+                          )}
                           <InfoRow icon={MapPin} label="Location" value={location} />
                           <InfoRow icon={CalendarDays} label="Joined" value={safeDate(user.createdAt)} />
                           <InfoRow icon={Clock} label="Last login" value="Active now" />
@@ -380,15 +442,29 @@ function ProfilePage() {
                           <SecurityRing score={securityScore} />
                           <div className="space-y-2">
                             {securityChecks.map((c) => (
-                              <div key={c.label} className="flex items-center gap-2">
+                              <div key={c.label} className="flex items-start gap-2">
                                 <span
-                                  className={`grid h-4 w-4 place-items-center rounded-full ${c.ok ? "bg-emerald-500/15 text-emerald-600" : "bg-ink-muted/10 text-ink-muted/50"}`}
+                                  className={`mt-0.5 grid h-4 w-4 place-items-center rounded-full ${c.ok ? "bg-emerald-500/15 text-emerald-600" : "bg-ink-muted/10 text-ink-muted/50"}`}
                                 >
                                   <BadgeCheck className="h-2.5 w-2.5" />
                                 </span>
-                                <span className={`text-[12px] font-light ${c.ok ? "text-brown-deep" : "text-ink-muted/60"}`}>
-                                  {c.label}
-                                </span>
+                                <div className="leading-tight">
+                                  <span className={`text-[12px] font-light ${c.ok ? "text-brown-deep" : "text-ink-muted/60"}`}>
+                                    {c.label}
+                                  </span>
+                                  {!c.ok && c.action && (
+                                    <button
+                                      type="button"
+                                      onClick={c.action}
+                                      className="block text-[11px] font-bold text-orange-glow hover:text-brown-deep transition-colors"
+                                    >
+                                      {c.actionLabel ?? "Fix now"} →
+                                    </button>
+                                  )}
+                                  {!c.ok && !c.action && c.hint && (
+                                    <span className="block text-[10px] font-light text-ink-muted/60">{c.hint}</span>
+                                  )}
+                                </div>
                               </div>
                             ))}
                           </div>
@@ -412,10 +488,16 @@ function ProfilePage() {
                           {orders.length > 0 && (
                             <button
                               onClick={() => switchTab("orders")}
-                              className="group inline-flex items-center gap-1 font-mono text-[10px] tracking-widest uppercase font-bold text-orange-glow"
+                              className="group relative inline-flex items-center gap-2 rounded-full bg-gradient-to-b from-[#4a3a32] to-[#2f211b] px-4 py-2.5 font-mono text-[10px] font-bold uppercase tracking-widest text-white shadow-[0_6px_0_0_#241812,0_10px_18px_-6px_rgba(58,42,34,0.6)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_8px_0_0_#241812,0_16px_26px_-8px_rgba(58,42,34,0.65)] active:translate-y-1 active:shadow-[0_2px_0_0_#241812,0_5px_12px_-6px_rgba(58,42,34,0.6)]"
                             >
-                              View all
-                              <ArrowUpRight className="h-3 w-3 transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                              {/* glossy top highlight for the 3D sheen */}
+                              <span
+                                aria-hidden
+                                className="pointer-events-none absolute inset-x-3 top-1 h-1/3 rounded-full bg-white/10 blur-[1px]"
+                              />
+                              <Sparkles className="h-3.5 w-3.5 text-orange-glow" />
+                              View All Orders
+                              <ArrowUpRight className="h-3.5 w-3.5 transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
                             </button>
                           )}
                         </div>
@@ -424,7 +506,9 @@ function ProfilePage() {
                           {ordersQuery.isLoading ? (
                             [0, 1].map((i) => <SkeletonOrderRow key={i} />)
                           ) : recentOrders.length > 0 ? (
-                            recentOrders.map((o) => <OrderRow key={o.id} order={o} />)
+                            recentOrders.map((o) => (
+                              <OrderRow key={o.id} order={o} onClick={() => setDetailOrder(o)} />
+                            ))
                           ) : (
                             <EmptyState
                               icon={Package}
@@ -469,6 +553,18 @@ function ProfilePage() {
                             key={o.id}
                             className="rounded-2xl sm:rounded-panel border border-line-hairline bg-surface-panel p-5 sm:p-6 backdrop-blur-medium shadow-sm transition-all duration-300 hover:shadow-md"
                           >
+                            <div
+                              role="button"
+                              tabIndex={0}
+                              onClick={() => setDetailOrder(o)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" || e.key === " ") {
+                                  e.preventDefault();
+                                  setDetailOrder(o);
+                                }
+                              }}
+                              className="group -m-1 cursor-pointer rounded-xl p-1 transition-colors"
+                            >
                             <div className="flex flex-col gap-4 border-b border-line-soft pb-4 sm:flex-row sm:items-center sm:justify-between">
                               <div className="flex flex-col gap-0.5">
                                 <span className="font-mono text-[10px] tracking-widest text-ink-muted uppercase font-bold">
@@ -483,17 +579,13 @@ function ProfilePage() {
                                   <span className="font-mono text-[10px] tracking-widest text-ink-muted uppercase font-bold">Total</span>
                                   <span className="font-display text-lg text-brown-deep font-bold">{fmtINR(o.totalPrice)}</span>
                                 </div>
-                                <span
-                                  className={`rounded-full border px-3 py-1 font-mono text-[10px] font-black uppercase tracking-widest ${statusTone[o.orderStatus] ?? statusTone.pending}`}
-                                >
-                                  {o.orderStatus}
-                                </span>
+                                <OrderStatusBadge status={o.orderStatus} refund={o.refund} />
                               </div>
                             </div>
                             <div className="mt-4 flex items-center gap-4">
                               <div className="h-16 w-14 rounded-xl overflow-hidden bg-cream border border-line-hairline shrink-0">
                                 {o.orderItems[0]?.image ? (
-                                  <img src={o.orderItems[0].image} alt="" className="h-full w-full object-cover" />
+                                  <img src={orderImageUrl(o.orderItems[0].image)} alt="" className="h-full w-full object-cover" />
                                 ) : (
                                   <div className="grid h-full w-full place-items-center">
                                     <Package className="h-5 w-5 text-ink-faint" />
@@ -509,42 +601,53 @@ function ProfilePage() {
                                   {o.orderItems.reduce((n, it) => n + it.quantity, 0) === 1 ? "" : "s"}
                                 </p>
                               </div>
+                              <span className="inline-flex shrink-0 items-center gap-1 font-mono text-[9px] font-bold uppercase tracking-widest text-ink-faint transition-colors group-hover:text-orange-glow">
+                                Details
+                                <ChevronRight className="h-3.5 w-3.5 transition-transform duration-300 group-hover:translate-x-0.5" />
+                              </span>
+                            </div>
                             </div>
                             {/* Action row — Track / Digital Invoice / Digital Receipt.
-                                Desktop: one row; mobile: 3-up touch grid. */}
-                            <div className="mt-4 grid grid-cols-3 gap-2.5 sm:flex sm:flex-wrap">
-                              <Link
-                                to="/track/$orderId"
-                                params={{ orderId: (o._id ?? o.id) as string }}
-                                className="inline-flex h-10 items-center justify-center gap-1.5 rounded-full bg-brown-deep px-4 font-mono text-[10px] font-bold uppercase tracking-widest text-white active:scale-95"
-                              >
-                                <Truck className="h-3.5 w-3.5" /> Track Order
-                              </Link>
-                              {(() => {
-                                const inv = documentUrl(o.invoiceUrl);
-                                const rec = documentUrl(o.receiptUrl);
-                                return (
-                                  <>
-                                    <a
-                                      href={inv}
-                                      target="_blank"
-                                      rel="noreferrer"
-                                      className={`inline-flex h-10 items-center justify-center gap-1.5 rounded-full border border-line-strong px-4 font-mono text-[10px] font-bold uppercase tracking-widest text-ink-muted transition-colors hover:text-brown-deep active:scale-95 ${!inv ? "pointer-events-none opacity-40" : ""}`}
-                                    >
-                                      <FileText className="h-3.5 w-3.5" /> Digital Invoice
-                                    </a>
-                                    <a
-                                      href={rec}
-                                      target="_blank"
-                                      rel="noreferrer"
-                                      className={`inline-flex h-10 items-center justify-center gap-1.5 rounded-full border border-line-strong px-4 font-mono text-[10px] font-bold uppercase tracking-widest text-ink-muted transition-colors hover:text-brown-deep active:scale-95 ${!rec ? "pointer-events-none opacity-40" : ""}`}
-                                    >
-                                      <Receipt className="h-3.5 w-3.5" /> Digital Receipt
-                                    </a>
-                                  </>
-                                );
-                              })()}
-                            </div>
+                                Desktop: one row; mobile: 3-up touch grid. Hidden once
+                                cancelled — the cancellation summary takes over below. */}
+                            {o.orderStatus !== "cancelled" && (
+                              <div className="mt-4 grid grid-cols-3 gap-2.5 sm:flex sm:flex-wrap">
+                                <Link
+                                  to="/track/$orderId"
+                                  params={{ orderId: (o._id ?? o.id) as string }}
+                                  className="inline-flex h-10 items-center justify-center gap-1.5 rounded-full bg-brown-deep px-4 font-mono text-[10px] font-bold uppercase tracking-widest text-white active:scale-95"
+                                >
+                                  <Truck className="h-3.5 w-3.5" /> Track Order
+                                </Link>
+                                {(() => {
+                                  const inv = documentUrl(o.invoiceUrl);
+                                  const rec = documentUrl(o.receiptUrl);
+                                  return (
+                                    <>
+                                      <a
+                                        href={inv}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className={`inline-flex h-10 items-center justify-center gap-1.5 rounded-full border border-line-strong px-4 font-mono text-[10px] font-bold uppercase tracking-widest text-ink-muted transition-colors hover:text-brown-deep active:scale-95 ${!inv ? "pointer-events-none opacity-40" : ""}`}
+                                      >
+                                        <FileText className="h-3.5 w-3.5" /> Digital Invoice
+                                      </a>
+                                      <a
+                                        href={rec}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className={`inline-flex h-10 items-center justify-center gap-1.5 rounded-full border border-line-strong px-4 font-mono text-[10px] font-bold uppercase tracking-widest text-ink-muted transition-colors hover:text-brown-deep active:scale-95 ${!rec ? "pointer-events-none opacity-40" : ""}`}
+                                      >
+                                        <Receipt className="h-3.5 w-3.5" /> Digital Receipt
+                                      </a>
+                                    </>
+                                  );
+                                })()}
+                              </div>
+                            )}
+
+                            {/* Cancel CTA (eligible) or post-cancellation summary. */}
+                            <OrderCancellation order={o} />
                           </div>
                         ))}
                       </div>
@@ -622,10 +725,24 @@ function ProfilePage() {
                             </Labeled>
                             <Labeled label="Phone">
                               <Input
-                                defaultValue={user.phoneNumber ?? ""}
+                                value={phoneField}
+                                onChange={(e) =>
+                                  setPhoneDraft(e.target.value.replace(/\D/g, "").slice(0, 10))
+                                }
+                                inputMode="numeric"
+                                maxLength={10}
                                 placeholder="9876543210"
                                 className="h-12 rounded-xl border-line-soft bg-surface-glass-ghost px-4 text-brown-deep focus:border-orange-glow transition-all"
                               />
+                              {phoneOtpEnabled && phoneChanged && phoneDraftValid && (
+                                <button
+                                  type="button"
+                                  onClick={() => setPhoneDialogOpen(true)}
+                                  className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-orange-glow transition-colors hover:text-brown-deep"
+                                >
+                                  <ShieldCheck className="h-3.5 w-3.5" /> Verify &amp; save number
+                                </button>
+                              )}
                             </Labeled>
                           </div>
                         </section>
@@ -671,6 +788,9 @@ function ProfilePage() {
                         </div>
                       </form>
                     </div>
+
+                    {/* Danger Zone — permanent account deletion (OTP-gated) */}
+                    <DeleteAccountSection />
                   </div>
                 )}
               </motion.div>
@@ -678,6 +798,48 @@ function ProfilePage() {
           </main>
         </div>
       </div>
+
+      {/* Full order details popup — opened by tapping any order */}
+      <OrderDetailModal order={detailOrder} onClose={() => setDetailOrder(null)} />
+
+      {/* Phone-change verification (Phone OTP). Saves only after a valid code. */}
+      <PhoneOtpDialog
+        open={phoneDialogOpen}
+        phone={phoneDraft10}
+        purpose="update"
+        title="Verify your new mobile"
+        onClose={() => setPhoneDialogOpen(false)}
+        onVerified={async (token, ph) => {
+          try {
+            await updatePhone.mutateAsync({ phone: ph, phoneVerifyToken: token });
+            toast.success("Mobile number updated");
+            setPhoneDraft(null);
+          } catch (err) {
+            toast.error(err instanceof Error ? err.message : "Could not update number");
+          } finally {
+            setPhoneDialogOpen(false);
+          }
+        }}
+      />
+
+      {/* Add phone from the Overview / Security score — collects the number, then OTP. */}
+      <PhoneOtpDialog
+        open={addPhoneOpen}
+        collectPhone
+        purpose="update"
+        title="Add your mobile"
+        onClose={() => setAddPhoneOpen(false)}
+        onVerified={async (token, ph) => {
+          try {
+            await updatePhone.mutateAsync({ phone: ph, phoneVerifyToken: token });
+            toast.success("Mobile number added");
+          } catch (err) {
+            toast.error(err instanceof Error ? err.message : "Could not add number");
+          } finally {
+            setAddPhoneOpen(false);
+          }
+        }}
+      />
     </div>
   );
 }
@@ -745,11 +907,13 @@ function InfoRow({
   label,
   value,
   verified,
+  action,
 }: {
   icon: typeof User;
   label: string;
   value: string;
   verified?: boolean;
+  action?: { label: string; onClick: () => void };
 }) {
   return (
     <div className="flex items-start gap-3">
@@ -758,10 +922,20 @@ function InfoRow({
       </span>
       <div className="min-w-0">
         <p className="font-mono text-[10px] tracking-widest text-ink-muted/70 uppercase font-bold">{label}</p>
-        <p className="mt-0.5 flex items-center gap-1.5 text-sm text-brown-deep font-medium break-words">
-          <span className="truncate">{value}</span>
-          {verified && <BadgeCheck className="h-3.5 w-3.5 shrink-0 text-emerald-500" />}
-        </p>
+        {action ? (
+          <button
+            type="button"
+            onClick={action.onClick}
+            className="mt-0.5 inline-flex items-center gap-1 text-sm font-semibold text-orange-glow transition-colors hover:text-brown-deep"
+          >
+            <Plus className="h-3.5 w-3.5" /> {action.label}
+          </button>
+        ) : (
+          <p className="mt-0.5 flex items-center gap-1.5 text-sm text-brown-deep font-medium break-words">
+            <span className="truncate">{value}</span>
+            {verified && <BadgeCheck className="h-3.5 w-3.5 shrink-0 text-emerald-500" />}
+          </p>
+        )}
       </div>
     </div>
   );
@@ -801,6 +975,7 @@ function SecurityRing({ score }: { score: number }) {
 
 function OrderRow({
   order,
+  onClick,
 }: {
   order: {
     id: string;
@@ -810,13 +985,18 @@ function OrderRow({
     totalPrice: number;
     orderItems: { name: string; image?: string; quantity: number }[];
   };
+  onClick?: () => void;
 }) {
   const count = order.orderItems.reduce((n, it) => n + it.quantity, 0);
   return (
-    <div className="flex items-center gap-4 rounded-xl border border-line-hairline bg-surface-panel-strong p-3 transition-all duration-300 hover:bg-white/70">
+    <button
+      type="button"
+      onClick={onClick}
+      className="group flex w-full items-center gap-4 rounded-xl border border-line-hairline bg-surface-panel-strong p-3 text-left transition-all duration-300 hover:bg-white/70 hover:shadow-sm"
+    >
       <div className="h-12 w-11 shrink-0 overflow-hidden rounded-lg bg-cream border border-line-hairline">
         {order.orderItems[0]?.image ? (
-          <img src={order.orderItems[0].image} alt="" className="h-full w-full object-cover" />
+          <img src={orderImageUrl(order.orderItems[0].image)} alt="" className="h-full w-full object-cover" />
         ) : (
           <div className="grid h-full w-full place-items-center">
             <Package className="h-4 w-4 text-ink-faint" />
@@ -829,12 +1009,9 @@ function OrderRow({
           {safeDate(order.createdAt)} · {count} item{count === 1 ? "" : "s"} · {fmtINR(order.totalPrice)}
         </p>
       </div>
-      <span
-        className={`rounded-full border px-2.5 py-1 font-mono text-[9px] font-black uppercase tracking-widest ${statusTone[order.orderStatus] ?? statusTone.pending}`}
-      >
-        {order.orderStatus}
-      </span>
-    </div>
+      <OrderStatusBadge status={order.orderStatus} />
+      <ChevronRight className="h-4 w-4 shrink-0 text-ink-faint transition-all duration-300 group-hover:translate-x-0.5 group-hover:text-orange-glow" />
+    </button>
   );
 }
 

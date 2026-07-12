@@ -33,13 +33,10 @@ const userSchema = new mongoose.Schema(
     },
     password: {
       type: String,
-      // Local accounts require a password; Google (passwordless) accounts do not.
-      required: [
-        function () {
-          return !this.googleId;
-        },
-        'Please enter your password',
-      ],
+      // Passwordless by default — accounts authenticate via email OTP or Google.
+      // Kept only for legacy accounts and the admin login, so it's optional and
+      // never required at creation. (minlength is enforced only when a value is
+      // actually set, e.g. the seeded admin.)
       minlength: [12, 'Password must be at least 12 characters'],
       select: false,
     },
@@ -56,19 +53,35 @@ const userSchema = new mongoose.Schema(
       enum: ['local', 'google'],
       default: 'local',
     },
+    // 'guest' = auto-created at guest checkout, no password, not a real signed-up
+    // account yet. Flips to 'registered' the moment a password is set (see
+    // authService.createPassword) or the user signs in via OTP/Google under the
+    // same email. Defaults to 'registered' so every pre-existing account (which
+    // predates this field) reads as a normal account with no migration needed.
+    accountType: {
+      type: String,
+      enum: ['guest', 'registered'],
+      default: 'registered',
+      index: true,
+    },
     role: {
       type: String,
       enum: ['user', 'admin'],
       default: 'user',
     },
     // Account moderation state. `blocked` users are rejected at login and are
-    // surfaced separately in the admin customers console. Defaults to active.
+    // surfaced separately in the admin customers console. `deleted` marks a
+    // self-service account deletion (soft delete): personal data is anonymized,
+    // sessions wiped, and login blocked, while order/refund history is kept.
+    // Defaults to active.
     status: {
       type: String,
-      enum: ['active', 'blocked'],
+      enum: ['active', 'blocked', 'deleted'],
       default: 'active',
       index: true,
     },
+    // When the account was soft-deleted (self-service). Null for live accounts.
+    deletedAt: { type: Date, default: null },
     isVerified: {
       type: Boolean,
       default: false,

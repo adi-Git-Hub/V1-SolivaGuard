@@ -55,6 +55,63 @@ exports.loginUser = catchAsyncErrors(async (req, res, next) => {
   });
 });
 
+// @desc    Request a passwordless sign-in code (login OR signup, unified)
+// @route   POST /api/v1/auth/request-otp
+// @access  Public
+exports.requestOtp = catchAsyncErrors(async (req, res, next) => {
+  const result = await authService.requestLoginOtp(req.body.email, req);
+
+  // Same response whether or not the account exists (no account enumeration).
+  return sendResponse(res, {
+    message: `We've sent a sign-in code to ${result.email}`,
+  });
+});
+
+// @desc    Verify the sign-in code → log in existing user or create + log in
+// @route   POST /api/v1/auth/verify-otp
+// @access  Public
+exports.verifyOtp = catchAsyncErrors(async (req, res, next) => {
+  const { email, otp } = req.body;
+  const { user, accessToken, refreshToken } = await authService.verifyLoginOtp(email, otp, req);
+
+  setAuthCookies(res, accessToken, refreshToken);
+
+  return sendResponse(res, {
+    data: { user },
+    message: 'Signed in successfully',
+  });
+});
+
+// @desc    Silently check whether an email already has an account (checkout's
+//          Contact Information step — branches to Welcome Back/Sign In vs
+//          Continue as guest)
+// @route   POST /api/v1/auth/check-email
+// @access  Public
+exports.checkEmail = catchAsyncErrors(async (req, res, next) => {
+  const result = await authService.checkEmailExists(req.body.email);
+
+  return sendResponse(res, {
+    data: result,
+  });
+});
+
+// @desc    Set a password on a passwordless account (guest checkout or
+//          OTP/Google signup) — converts it to a fully registered account.
+//          Gated by the same email-OTP challenge /request-otp sends.
+// @route   POST /api/v1/auth/create-password
+// @access  Public (OTP-gated)
+exports.createPassword = catchAsyncErrors(async (req, res, next) => {
+  const { email, otp, password } = req.body;
+  const { user, accessToken, refreshToken } = await authService.createPassword(email, otp, password, req);
+
+  setAuthCookies(res, accessToken, refreshToken);
+
+  return sendResponse(res, {
+    data: { user },
+    message: 'Password created successfully',
+  });
+});
+
 // @desc    Sign in / sign up with Google (Firebase ID token)
 // @route   POST /api/v1/auth/google
 // @access  Public
@@ -161,6 +218,29 @@ exports.logoutAll = catchAsyncErrors(async (req, res, next) => {
   
   return sendResponse(res, {
     message: 'Logged out from all devices successfully',
+  });
+});
+
+// @desc    Request an email OTP to confirm account deletion
+// @route   POST /api/v1/auth/delete-account/request-otp
+// @access  Private
+exports.requestAccountDeletionOtp = catchAsyncErrors(async (req, res, next) => {
+  const result = await authService.requestAccountDeletionOtp(req.user.id, req);
+
+  return sendResponse(res, {
+    message: `We've sent a confirmation code to ${result.email}`,
+  });
+});
+
+// @desc    Permanently delete (soft-delete + anonymize) the logged-in account
+// @route   POST /api/v1/auth/delete-account
+// @access  Private (OTP-gated)
+exports.deleteAccount = catchAsyncErrors(async (req, res, next) => {
+  await authService.deleteAccount(req.user.id, req.body.otp, req);
+  clearAuthCookies(res);
+
+  return sendResponse(res, {
+    message: 'Your account has been deleted.',
   });
 });
 

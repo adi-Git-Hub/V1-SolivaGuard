@@ -1,21 +1,40 @@
-import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
-import { motion } from "framer-motion";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowRight,
+  ArrowLeft,
   CheckCircle2,
+  Mail,
+  Smartphone,
+  RefreshCw,
   Sun,
   Feather,
   ShieldCheck,
   ThermometerSun,
 } from "lucide-react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useState, forwardRef, type InputHTMLAttributes } from "react";
+import {
+  useState,
+  useRef,
+  useEffect,
+  forwardRef,
+  type InputHTMLAttributes,
+  type ClipboardEvent,
+  type KeyboardEvent,
+  type FormEvent,
+} from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 
-import { useLogin } from "@/features/auth/api";
-import { loginSchema, type LoginInput } from "@/features/auth/schema";
+import {
+  useRequestOtp,
+  useVerifyOtp,
+  useRequestPhoneLoginOtp,
+  useVerifyPhoneLoginOtp,
+  usePublicConfig,
+} from "@/features/auth/api";
+import { requestOtpSchema, type RequestOtpInput } from "@/features/auth/schema";
 import { GoogleAuthButton } from "@/features/auth/components/GoogleAuthButton";
 import { RestrictedModal, isRestrictedError } from "@/features/auth/components/RestrictedModal";
 import { reportBrowserLocation } from "@/features/auth/location";
@@ -30,12 +49,18 @@ export const Route = createFileRoute("/_auth/login")({
   component: LoginRoute,
 });
 
+const RESEND_SECONDS = 30;
+
+// Signature Soliva ease curve, typed as a cubic-bezier tuple so framer-motion's
+// Variants type accepts it (a bare array widens to number[] and is rejected).
+const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
+
 const fadeInUp = {
   hidden: { opacity: 0, y: 18 },
   visible: (i: number) => ({
     opacity: 1,
     y: 0,
-    transition: { delay: i * 0.08, duration: 0.7, ease: [0.22, 1, 0.36, 1] },
+    transition: { delay: i * 0.08, duration: 0.7, ease: EASE },
   }),
 };
 
@@ -49,31 +74,158 @@ const TRUST = [
 function LoginRoute() {
   const { redirect } = Route.useSearch();
   const navigate = useNavigate();
-  const login = useLogin();
+  const requestOtp = useRequestOtp();
+  const verifyOtp = useVerifyOtp();
+  const requestPhoneOtp = useRequestPhoneLoginOtp();
+  const verifyPhoneOtp = useVerifyPhoneLoginOtp();
+  // Phone sign-in is only offered once MSG91 is configured on the backend.
+  const { data: publicConfig } = usePublicConfig();
+  const phoneEnabled = !!publicConfig?.phoneOtpEnabled;
+
+  // Two-step passwordless flow: "email" → "code".
+  const [step, setStep] = useState<"email" | "code">("email");
+  const [email, setEmail] = useState("");
+  // Sign-in method. "phone" is reachable only when phoneEnabled is true.
+  const [method, setMethod] = useState<"email" | "phone">("email");
+  const [phone, setPhone] = useState("");
+  const [phoneError, setPhoneError] = useState("");
   const [success, setSuccess] = useState(false);
   const [restricted, setRestricted] = useState(false);
+
+  // 6-digit code state (only used on the "code" step).
+  const [otpDigits, setOtpDigits] = useState<string[]>(["", "", "", "", "", ""]);
+  const [timer, setTimer] = useState(0);
+  const otpRefs = useRef<Array<HTMLInputElement | null>>([]);
+  const otp = otpDigits.join("");
 
   const {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
-  } = useForm<LoginInput>({
-    resolver: zodResolver(loginSchema),
+  } = useForm<RequestOtpInput>({
+    resolver: zodResolver(requestOtpSchema),
   });
 
-  const onSubmit = handleSubmit(async (values) => {
+  // Resend cooldown.
+  useEffect(() => {
+    if (timer <= 0) return;
+    const id = setInterval(() => setTimer((t) => t - 1), 1000);
+    return () => clearInterval(id);
+  }, [timer]);
+
+  // ── Step 1: send the code ──
+  const sendCode = handleSubmit(async ({ email: enteredEmail }) => {
     try {
-      await login.mutateAsync(values);
-      setSuccess(true);
-      reportBrowserLocation(); // opt-in precise location, best-effort
-      toast.success("Welcome back");
-      // brief success transition before leaving the page
-      setTimeout(() => navigate({ to: redirect ?? "/" }), 650);
+      await requestOtp.mutateAsync(enteredEmail);
+      setEmail(enteredEmail);
+      setStep("code");
+      setOtpDigits(["", "", "", "", "", ""]);
+      setTimer(RESEND_SECONDS);
+      toast.success(`We sent a sign-in code to ${enteredEmail}`);
+      setTimeout(() => otpRefs.current[0]?.focus(), 120);
     } catch (err) {
-      if (isRestrictedError(err)) { setRestricted(true); return; }
-      toast.error(err instanceof Error ? err.message : "Could not sign in");
+      toast.error(err instanceof Error ? err.message : "Could not send the code");
     }
   });
+
+  // ── Step 1 (phone): send the code to an existing account's mobile ──
+  const sendPhoneCode = async (e: FormEvent) => {
+    e.preventDefault();
+    const digits = phone.replace(/\D/g, "").slice(-10);
+    if (!/^[6-9]\d{9}$/.test(digits)) {
+      setPhoneError("Enter a valid 10-digit mobile number");
+      return;
+    }
+    setPhoneError("");
+    try {
+      await requestPhoneOtp.mutateAsync(digits);
+      setPhone(digits);
+      setStep("code");
+      setOtpDigits(["", "", "", "", "", ""]);
+      setTimer(RESEND_SECONDS);
+      toast.success("We sent a sign-in code to your mobile");
+      setTimeout(() => otpRefs.current[0]?.focus(), 120);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Could not send the code";
+      setPhoneError(msg);
+      toast.error(msg);
+    }
+  };
+
+  const resendCode = async () => {
+    const pending = requestOtp.isPending || requestPhoneOtp.isPending;
+    if (timer > 0 || pending) return;
+    try {
+      if (method === "phone") await requestPhoneOtp.mutateAsync(phone);
+      else await requestOtp.mutateAsync(email);
+      setOtpDigits(["", "", "", "", "", ""]);
+      setTimer(RESEND_SECONDS);
+      otpRefs.current[0]?.focus();
+      toast.success("New code sent");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not resend the code");
+    }
+  };
+
+  // ── Step 2: verify the code ──
+  const runVerify = async (code: string) => {
+    if (code.length !== 6 || verifyOtp.isPending || verifyPhoneOtp.isPending || success) return;
+    try {
+      if (method === "phone") await verifyPhoneOtp.mutateAsync({ phone, otp: code });
+      else await verifyOtp.mutateAsync({ email, otp: code });
+      setSuccess(true);
+      reportBrowserLocation(); // opt-in precise location, best-effort
+      toast.success("Welcome to Soliva");
+      setTimeout(() => navigate({ to: redirect ?? "/" }), 650);
+    } catch (err) {
+      if (isRestrictedError(err)) {
+        setRestricted(true);
+        setOtpDigits(["", "", "", "", "", ""]);
+        return;
+      }
+      setOtpDigits(["", "", "", "", "", ""]);
+      otpRefs.current[0]?.focus();
+      toast.error(err instanceof Error ? err.message : "Invalid or expired code");
+    }
+  };
+
+  // Auto-verify the moment all 6 digits are present.
+  useEffect(() => {
+    if (step === "code" && !success && otp.length === 6) void runVerify(otp);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [otp, step, success]);
+
+  const setDigit = (i: number, value: string) => {
+    const char = value.replace(/\D/g, "").slice(-1);
+    setOtpDigits((prev) => {
+      const next = [...prev];
+      next[i] = char;
+      return next;
+    });
+    if (char && i < 5) otpRefs.current[i + 1]?.focus();
+  };
+
+  const onOtpKeyDown = (i: number, e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Backspace" && !otpDigits[i] && i > 0) {
+      otpRefs.current[i - 1]?.focus();
+    }
+  };
+
+  const onOtpPaste = (e: ClipboardEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+    if (!pasted) return;
+    const next = ["", "", "", "", "", ""];
+    pasted.split("").forEach((d, idx) => (next[idx] = d));
+    setOtpDigits(next);
+    otpRefs.current[Math.min(pasted.length, 5)]?.focus();
+  };
+
+  const backToEmail = () => {
+    setStep("email");
+    setOtpDigits(["", "", "", "", "", ""]);
+    setTimer(0);
+  };
 
   return (
     <div className="fixed inset-0 z-20 flex flex-col lg:flex-row bg-[#FAF7F3] overflow-y-auto lg:overflow-hidden">
@@ -165,83 +317,216 @@ function LoginRoute() {
             variants={fadeInUp}
             className="rounded-[28px] border border-white/70 bg-white/70 p-7 sm:p-9 shadow-[0_24px_70px_-20px_rgba(58,42,34,0.28)] backdrop-blur-xl"
           >
-            {/* title */}
-            <div className="mb-7">
-              <h2 className="font-display text-[2rem] leading-tight text-[#3a2a22] tracking-tight">Sign In</h2>
-              <p className="mt-1 text-ink-muted font-light text-[15px]">Welcome back. Continue your ritual.</p>
-            </div>
+            <AnimatePresence mode="wait" initial={false}>
+              {step === "email" ? (
+                /* ─────────── STEP 1 — EMAIL ─────────── */
+                <motion.div
+                  key="email"
+                  initial={{ opacity: 0, x: -12 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -12 }}
+                  transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+                >
+                  {/* title */}
+                  <div className="mb-7">
+                    <h2 className="font-display text-[2rem] leading-tight text-[#3a2a22] tracking-tight">Sign In</h2>
+                    <p className="mt-1 text-ink-muted font-light text-[15px]">
+                      {method === "phone"
+                        ? "Enter your mobile number — we'll text you a sign-in code."
+                        : "Enter your email — we'll send you a sign-in code."}
+                    </p>
+                  </div>
 
-            {/* google */}
-            <GoogleAuthButton redirectTo={redirect ?? "/"} onRestricted={() => setRestricted(true)} />
+                  {/* google */}
+                  <GoogleAuthButton redirectTo={redirect ?? "/"} onRestricted={() => setRestricted(true)} />
 
-            {/* divider */}
-            <div className="my-6 flex items-center gap-4">
-              <span className="h-px flex-1 bg-[#3a2a22]/10" />
-              <span className="font-mono text-[9px] uppercase tracking-[0.3em] text-ink-muted/45 font-bold">Or continue with email</span>
-              <span className="h-px flex-1 bg-[#3a2a22]/10" />
-            </div>
+                  {/* divider */}
+                  <div className="my-6 flex items-center gap-4">
+                    <span className="h-px flex-1 bg-[#3a2a22]/10" />
+                    <span className="font-mono text-[9px] uppercase tracking-[0.3em] text-ink-muted/45 font-bold">{method === "phone" ? "Or continue with mobile" : "Or continue with email"}</span>
+                    <span className="h-px flex-1 bg-[#3a2a22]/10" />
+                  </div>
 
-            <form onSubmit={onSubmit} className="space-y-5" noValidate>
-              <FloatingField
-                id="email"
-                label="Email Address"
-                type="email"
-                autoComplete="email"
-                error={errors.email?.message}
-                {...register("email")}
-              />
+                  {method === "email" ? (
+                    <form onSubmit={sendCode} className="space-y-5" noValidate>
+                      <FloatingField
+                        id="email"
+                        label="Email Address"
+                        type="email"
+                        autoComplete="email"
+                        autoFocus
+                        error={errors.email?.message}
+                        {...register("email")}
+                      />
 
-              <FloatingField
-                id="password"
-                label="Password"
-                type="password"
-                autoComplete="current-password"
-                error={errors.password?.message}
-                topRight={
-                  <Link
-                    to="/forgot-password"
-                    className="text-[10px] font-bold uppercase tracking-[0.14em] text-ink-muted/60 hover:text-[#c76600] transition-colors"
+                      <button
+                        type="submit"
+                        disabled={isSubmitting || requestOtp.isPending}
+                        className="group h-13 w-full rounded-2xl bg-[#c76600] text-xs font-bold uppercase tracking-[0.15em] text-white shadow-xl shadow-[#c76600]/20 transition-all duration-300 hover:bg-[#a55500] hover:-translate-y-0.5 disabled:translate-y-0 disabled:opacity-70"
+                      >
+                        {isSubmitting || requestOtp.isPending ? (
+                          <span className="flex items-center justify-center gap-3">
+                            <span className="h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                            Sending code…
+                          </span>
+                        ) : (
+                          <span className="flex items-center justify-center gap-2">
+                            Continue
+                            <ArrowRight size={14} className="transition-transform group-hover:translate-x-1" />
+                          </span>
+                        )}
+                      </button>
+                    </form>
+                  ) : (
+                    <form onSubmit={sendPhoneCode} className="space-y-5" noValidate>
+                      <FloatingField
+                        id="phone"
+                        label="Mobile Number"
+                        type="tel"
+                        inputMode="numeric"
+                        autoComplete="tel"
+                        autoFocus
+                        maxLength={10}
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                        error={phoneError}
+                      />
+
+                      <button
+                        type="submit"
+                        disabled={requestPhoneOtp.isPending}
+                        className="group h-13 w-full rounded-2xl bg-[#c76600] text-xs font-bold uppercase tracking-[0.15em] text-white shadow-xl shadow-[#c76600]/20 transition-all duration-300 hover:bg-[#a55500] hover:-translate-y-0.5 disabled:translate-y-0 disabled:opacity-70"
+                      >
+                        {requestPhoneOtp.isPending ? (
+                          <span className="flex items-center justify-center gap-3">
+                            <span className="h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                            Sending code…
+                          </span>
+                        ) : (
+                          <span className="flex items-center justify-center gap-2">
+                            Continue
+                            <ArrowRight size={14} className="transition-transform group-hover:translate-x-1" />
+                          </span>
+                        )}
+                      </button>
+                    </form>
+                  )}
+
+                  {phoneEnabled && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMethod((m) => (m === "email" ? "phone" : "email"));
+                        setPhoneError("");
+                      }}
+                      className="mt-5 flex w-full items-center justify-center gap-2 text-[11px] font-bold uppercase tracking-widest text-ink-muted hover:text-[#c76600] transition-colors"
+                    >
+                      {method === "email" ? (
+                        <>
+                          <Smartphone size={13} /> Sign in with mobile number
+                        </>
+                      ) : (
+                        <>
+                          <Mail size={13} /> Sign in with email
+                        </>
+                      )}
+                    </button>
+                  )}
+
+                  {method === "email" && (
+                    <p className="mt-6 text-center text-xs text-ink-muted font-light leading-relaxed">
+                      New to Soliva? Just enter your email —
+                      <br className="hidden sm:block" /> we'll set up your account automatically.
+                    </p>
+                  )}
+                </motion.div>
+              ) : (
+                /* ─────────── STEP 2 — CODE ─────────── */
+                <motion.div
+                  key="code"
+                  initial={{ opacity: 0, x: 12 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 12 }}
+                  transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+                >
+                  {/* back + title */}
+                  <button
+                    type="button"
+                    onClick={backToEmail}
+                    disabled={success}
+                    className="mb-5 inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-ink-muted/70 hover:text-[#c76600] transition-colors disabled:opacity-40"
                   >
-                    Forgot?
-                  </Link>
-                }
-                {...register("password")}
-              />
+                    <ArrowLeft size={13} /> {method === "phone" ? "Use a different number" : "Use a different email"}
+                  </button>
 
-              <button
-                type="submit"
-                disabled={isSubmitting || success}
-                className={`group h-13 w-full rounded-2xl text-xs font-bold uppercase tracking-[0.15em] text-white shadow-xl transition-all duration-300 disabled:translate-y-0 ${
-                  success
-                    ? "bg-green-600 shadow-green-600/20"
-                    : "bg-[#c76600] shadow-[#c76600]/20 hover:bg-[#a55500] hover:-translate-y-0.5 disabled:opacity-70"
-                }`}
-              >
-                {success ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <CheckCircle2 size={15} /> Signed In
-                  </span>
-                ) : isSubmitting ? (
-                  <span className="flex items-center justify-center gap-3">
-                    <span className="h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
-                    Signing in…
-                  </span>
-                ) : (
-                  <span className="flex items-center justify-center gap-2">
-                    Sign In
-                    <ArrowRight size={14} className="transition-transform group-hover:translate-x-1" />
-                  </span>
-                )}
-              </button>
-            </form>
-          </motion.div>
+                  <div className="mb-6 flex items-center gap-3">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#c76600]/10 text-[#c76600]">
+                      {method === "phone" ? <Smartphone size={18} /> : <Mail size={18} />}
+                    </div>
+                    <div className="min-w-0">
+                      <h2 className="font-display text-[1.5rem] leading-tight text-[#3a2a22] tracking-tight">
+                        {method === "phone" ? "Check your phone" : "Check your email"}
+                      </h2>
+                      <p className="text-ink-muted font-light text-[13px] truncate">
+                        Code sent to{" "}
+                        <span className="font-semibold text-[#3a2a22]">
+                          {method === "phone" ? `+91 ${phone}` : email}
+                        </span>
+                      </p>
+                    </div>
+                  </div>
 
-          {/* secondary link */}
-          <motion.div custom={2} variants={fadeInUp} className="mt-6 flex items-center justify-center gap-3 text-xs">
-            <span className="text-ink-muted font-light">New to Soliva?</span>
-            <Link to="/register" className="text-[#3a2a22] font-bold uppercase tracking-widest hover:text-[#c76600] transition-colors">
-              Create Account
-            </Link>
+                  {success ? (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.96 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ type: "spring", stiffness: 420, damping: 24 }}
+                      className="flex items-center justify-center gap-2 rounded-2xl bg-green-500/10 border border-green-500/20 px-4 py-4 text-green-600"
+                    >
+                      <CheckCircle2 size={20} />
+                      <span className="text-sm font-semibold">Signed in — taking you in…</span>
+                    </motion.div>
+                  ) : (
+                    <>
+                      <div className="flex justify-between gap-2" onPaste={onOtpPaste}>
+                        {otpDigits.map((digit, i) => (
+                          <input
+                            key={i}
+                            ref={(el) => {
+                              otpRefs.current[i] = el;
+                            }}
+                            type="text"
+                            inputMode="numeric"
+                            autoComplete="one-time-code"
+                            maxLength={1}
+                            value={digit}
+                            disabled={verifyOtp.isPending || verifyPhoneOtp.isPending}
+                            onChange={(e) => setDigit(i, e.target.value)}
+                            onKeyDown={(e) => onOtpKeyDown(i, e)}
+                            className="aspect-square w-full min-w-0 max-w-[60px] sm:h-14 rounded-2xl border border-black/10 bg-white text-center text-xl font-display text-[#3a2a22] shadow-sm outline-none transition-all focus:border-[#c76600] focus:ring-4 focus:ring-[#c76600]/12 disabled:opacity-60"
+                          />
+                        ))}
+                      </div>
+
+                      <div className="mt-5 flex items-center justify-between px-0.5">
+                        <span className="text-[11px] text-ink-muted/60 font-medium">
+                          {verifyOtp.isPending || verifyPhoneOtp.isPending ? "Verifying…" : "Verifies automatically"}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={resendCode}
+                          disabled={timer > 0 || requestOtp.isPending || requestPhoneOtp.isPending}
+                          className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-ink-muted hover:text-[#c76600] transition-colors disabled:opacity-40"
+                        >
+                          <RefreshCw size={11} className={requestOtp.isPending || requestPhoneOtp.isPending ? "animate-spin" : ""} />
+                          {timer > 0 ? `Resend in ${timer}s` : "Resend code"}
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </motion.div>
         </motion.div>
       </main>

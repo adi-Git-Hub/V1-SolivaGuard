@@ -50,10 +50,14 @@ const getOTPTemplate = (otp, type) => {
   const titles = {
     verification: 'Verify your email',
     forgotPassword: 'Reset your password',
+    signin: 'Your sign-in code',
+    deleteAccount: 'Confirm account deletion',
   };
   const messages = {
     verification: 'Thank you for joining Soliva. Use the code below to verify your email address. It is valid for 10 minutes.',
     forgotPassword: 'We received a request to reset your password. Use the code below to proceed. It is valid for 10 minutes.',
+    signin: 'Use the code below to sign in to Soliva. It is valid for 10 minutes. If you did not request it, you can safely ignore this email.',
+    deleteAccount: 'We received a request to permanently delete your Soliva account. Enter the code below to confirm. It is valid for 10 minutes. If you did not request this, ignore this email and your account stays safe — no code, no deletion.',
   };
 
   return brandWrap({
@@ -426,6 +430,115 @@ const getInboundConfirmationTemplate = (name, kind = 'message') =>
     footnote: 'This is an automated confirmation — but a real person will follow up.',
   });
 
+// ── Order cancellation ───────────────────────────────────────────────────
+const REFUND_TIMELINE_NOTE =
+  'Refunds are generally processed within 5–7 business days. The exact timeline may vary depending on your payment method.';
+
+// → Customer: their order has been cancelled (+ refund status if applicable).
+const getOrderCancellationCustomerTemplate = ({
+  customerName,
+  orderId,
+  orderItems = [],
+  totalPrice = 0,
+  reason,
+  refundRequired,
+  refundStatusLabel,
+}) => {
+  const shortOrderId = String(orderId).slice(-8).toUpperCase();
+  const first = String(customerName || '').trim().split(/\s+/)[0] || 'there';
+
+  const itemRows = (orderItems || [])
+    .map(
+      (item) => `
+      <tr>
+        <td style="padding:12px 0;border-bottom:1px solid rgba(58,42,34,0.06);font-family:Helvetica,Arial,sans-serif;">
+          <p style="margin:0;font-size:14px;color:#3a2a22;font-weight:500;">${esc(item.name)}</p>
+          <p style="margin:4px 0 0;font-size:12px;color:#a08f84;letter-spacing:0.5px;">Qty: ${esc(item.quantity)}</p>
+        </td>
+        <td style="padding:12px 0;border-bottom:1px solid rgba(58,42,34,0.06);text-align:right;font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#3a2a22;">₹${(
+          (item.price || 0) * (item.quantity || 0)
+        ).toLocaleString('en-IN')}</td>
+      </tr>`,
+    )
+    .join('');
+
+  const refundBlock = refundRequired
+    ? `
+      <div style="margin-top:22px;padding:18px 20px;background:#f4ece1;border-radius:12px;border:1px solid #ead9c6;font-family:Helvetica,Arial,sans-serif;">
+        <p style="margin:0 0 6px;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#a89a8d;font-weight:bold;">Refund Status</p>
+        <p style="margin:0 0 8px;font-size:16px;color:#3a2a22;font-weight:600;">${esc(refundStatusLabel || 'Processing')}</p>
+        <p style="margin:0;font-size:13px;line-height:1.6;color:#7b6a5f;">${REFUND_TIMELINE_NOTE}</p>
+      </div>`
+    : `
+      <div style="margin-top:22px;padding:18px 20px;background:#f4ece1;border-radius:12px;border:1px solid #ead9c6;font-family:Helvetica,Arial,sans-serif;">
+        <p style="margin:0 0 6px;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#a89a8d;font-weight:bold;">Refund Status</p>
+        <p style="margin:0;font-size:16px;color:#3a2a22;font-weight:600;">Not applicable</p>
+        <p style="margin:6px 0 0;font-size:13px;line-height:1.6;color:#7b6a5f;">This order had no completed payment, so no refund is required.</p>
+      </div>`;
+
+  return brandWrap({
+    heading: 'Your order has been cancelled',
+    intro: `Hi ${esc(first)}, we're sorry your order didn't work out. As requested, order #${esc(shortOrderId)} has been cancelled. Here's a summary for your records.`,
+    bodyHtml: `
+      <p style="margin:0 0 12px;font-family:Helvetica,Arial,sans-serif;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#a89a8d;font-weight:bold;">Order Summary</p>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+        ${itemRows}
+        <tr>
+          <td style="padding:14px 0 0;font-family:Helvetica,Arial,sans-serif;font-size:13px;color:#7b6a5f;">Order total</td>
+          <td style="padding:14px 0 0;text-align:right;font-family:Georgia,'Times New Roman',serif;font-size:20px;color:#3a2a22;">₹${Number(totalPrice).toLocaleString('en-IN')}</td>
+        </tr>
+      </table>
+
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:22px;border-top:1px solid #efe7dd;">
+        ${detailRow('Order ID', shortOrderId)}
+        ${detailRow('Cancellation reason', reason)}
+      </table>
+
+      ${refundBlock}`,
+    footnote:
+      'Need help? Contact us at <a href="mailto:support@soliva.in" style="color:#c76600;text-decoration:none;">support@soliva.in</a> and a real person will assist you.',
+  });
+};
+
+// → Admin: a customer just cancelled an order (operational notice).
+const getOrderCancellationAdminTemplate = ({
+  customerName,
+  customerEmail,
+  orderId,
+  productName,
+  variant,
+  quantity,
+  orderAmount,
+  paymentMethod,
+  paymentStatus,
+  reason,
+  refundRequired,
+  cancelledAt,
+}) =>
+  brandWrap({
+    heading: 'Order cancelled by customer',
+    intro: 'A customer cancelled their order through the account dashboard. Details below.',
+    bodyHtml: `
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid #efe7dd;">
+        ${detailRow('Customer', customerName)}
+        ${detailRow('Email', customerEmail)}
+        ${detailRow('Order ID', orderId)}
+        ${detailRow('Product', productName)}
+        ${detailRow('Variant', variant || 'N/A')}
+        ${detailRow('Quantity', quantity)}
+        ${detailRow('Order amount', orderAmount != null ? `₹${Number(orderAmount).toLocaleString('en-IN')}` : '')}
+        ${detailRow('Payment method', paymentMethod)}
+        ${detailRow('Payment status', paymentStatus)}
+        ${detailRow('Cancellation reason', reason)}
+        ${detailRow('Refund required', refundRequired)}
+        ${detailRow('Cancelled at', cancelledAt ? new Date(cancelledAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) : '')}
+      </table>`,
+    footnote:
+      refundRequired === 'Yes'
+        ? 'A refund was auto-initiated for this order. Verify it in the Razorpay dashboard.'
+        : 'No refund is required for this order (payment was not completed).',
+  });
+
 module.exports = {
   getOTPTemplate,
   getWelcomeTemplate,
@@ -434,4 +547,6 @@ module.exports = {
   getContactNotificationTemplate,
   getFeedbackNotificationTemplate,
   getInboundConfirmationTemplate,
+  getOrderCancellationCustomerTemplate,
+  getOrderCancellationAdminTemplate,
 };

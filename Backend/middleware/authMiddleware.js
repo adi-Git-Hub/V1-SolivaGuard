@@ -35,6 +35,30 @@ exports.isAuthenticatedUser = catchAsyncErrors(async (req, res, next) => {
   }
 });
 
+// Optional auth for endpoints that must serve both signed-in users and guests
+// through the same code path (e.g. order creation). Never rejects — a
+// missing/invalid/expired token just leaves req.user unset instead of erroring,
+// so the route handler treats the request as a guest.
+exports.attachUserIfPresent = catchAsyncErrors(async (req, res, next) => {
+  const { accessToken } = req.cookies;
+  if (!accessToken) return next();
+
+  try {
+    const decoded = jwt.verify(accessToken, process.env.JWT_SECRET);
+    const user = await User.findById(decoded.id);
+    if (!user) return next();
+
+    const session = user.sessions.find(s => s.sessionId === decoded.sessionId);
+    if (!session || session.expiresAt < new Date()) return next();
+
+    req.user = user;
+    req.sessionId = decoded.sessionId;
+  } catch (_) {
+    // Invalid/expired token — proceed as a guest rather than failing the request.
+  }
+  next();
+});
+
 exports.authorizeRoles = (...roles) => {
   return (req, res, next) => {
     if (!roles.includes(req.user.role)) {

@@ -10,7 +10,7 @@
 
 import { z } from "zod";
 
-import { api, ApiError } from "./api";
+import { api, ApiError, assetUrl } from "./api";
 
 export const userSchema = z.object({
   id: z.string(),
@@ -51,8 +51,7 @@ function normalizeUser(raw: unknown): User {
     isVerified: r.isVerified,
     username: r.username,
     phoneNumber: (r.phoneNumber as string | null | undefined) ?? null,
-    avatarUrl: ((r.avatarUrl as string | null | undefined) ?? null)
-      ?.replace(/^http:\/\//, 'https://') ?? null,
+    avatarUrl: assetUrl((r.avatarUrl as string | null | undefined) ?? null),
     createdAt: (r.createdAt as string | null | undefined) ?? null,
     sessionsCount: Array.isArray(r.loginSessions) ? r.loginSessions.length : undefined,
   });
@@ -74,6 +73,27 @@ export const authClient = {
 
   async login(input: { email: string; password: string }): Promise<Session> {
     const res = await api.post<EnvelopedResponse<{ user: unknown }>>("/auth/login", input);
+    return { user: normalizeUser(res.data.user) };
+  },
+
+  /**
+   * Passwordless sign-in — step 1. Sends a 6-digit code to the email. This is a
+   * unified entry point: it works for existing accounts (Google OR email) and
+   * for brand-new emails alike, so the response is intentionally identical
+   * either way (no account enumeration). No session is created yet.
+   */
+  async requestOtp(email: string): Promise<{ email: string }> {
+    await api.post<EnvelopedResponse<unknown>>("/auth/request-otp", { email });
+    return { email };
+  },
+
+  /**
+   * Passwordless sign-in — step 2. Verifies the code; the backend logs in the
+   * existing user or auto-creates a passwordless account, then sets the JWT
+   * cookie — same Session shape as every other auth path.
+   */
+  async verifyOtp(input: { email: string; otp: string }): Promise<Session> {
+    const res = await api.post<EnvelopedResponse<{ user: unknown }>>("/auth/verify-otp", input);
     return { user: normalizeUser(res.data.user) };
   },
 
@@ -111,7 +131,7 @@ export const authClient = {
 
   /** Verifies the registration OTP; backend issues the JWT cookie on success. */
   async verifyEmail(input: { email: string; otp: string }): Promise<Session> {
-    const res = await api.post<EnvelopedResponse<{ user: unknown }>>("/auth/verify-email", input);
+    const res = await api.post<EnvelopedResponse<{ user: unknown }>>("/auth/confirm-email", input);
     return { user: normalizeUser(res.data.user) };
   },
 
@@ -133,6 +153,19 @@ export const authClient = {
     return { user: normalizeUser(res.data.user) };
   },
 
+  /**
+   * Silent existence check for the checkout Contact Information step. Reveals
+   * whether the email has a real account (unlike requestOtp, which never
+   * does) so the UI can offer Sign In / Use Another Email inline.
+   */
+  async checkEmail(email: string): Promise<{ exists: boolean; accountType: "guest" | "registered" | null }> {
+    const res = await api.post<EnvelopedResponse<{ exists: boolean; accountType: "guest" | "registered" | null }>>(
+      "/auth/check-email",
+      { email },
+    );
+    return res.data;
+  },
+
   async adminLogin(input: { email: string; password: string }): Promise<Session> {
     const res = await api.post<EnvelopedResponse<{ user: unknown }>>("/auth/admin-login", input);
     return { user: normalizeUser(res.data.user) };
@@ -140,5 +173,85 @@ export const authClient = {
 
   async logout(): Promise<void> {
     await api.get<EnvelopedResponse<unknown>>("/auth/logout");
+  },
+
+  /**
+   * Account deletion — step 1. Emails a 6-digit confirmation code to the
+   * logged-in account's own address. No body needed; the backend reads the
+   * user from the session cookie.
+   */
+  async requestAccountDeletionOtp(): Promise<void> {
+    await api.post<EnvelopedResponse<unknown>>("/auth/delete-account/request-otp", {});
+  },
+
+  /**
+   * Account deletion — step 2. Verifies the code, then the backend soft-deletes
+   * + anonymizes the account and wipes every session (so the cookie is dead).
+   */
+  async deleteAccount(otp: string): Promise<void> {
+    await api.post<EnvelopedResponse<unknown>>("/auth/delete-account", { otp });
+  },
+
+  // ── Phone OTP (MSG91) ──────────────────────────────────────────────────────
+
+  /** Public runtime flags — `phoneOtpEnabled` gates every phone-OTP affordance. */
+  async getPublicConfig(): Promise<{ phoneOtpEnabled: boolean }> {
+    const res = await api.get<EnvelopedResponse<{ phoneOtpEnabled: boolean }>>("/system/config");
+    return res.data;
+  },
+
+  /** Phone sign-in — step 1. Sends a code to an existing account's mobile. */
+  async requestPhoneLoginOtp(phone: string): Promise<{ phone: string }> {
+    const res = await api.post<EnvelopedResponse<{ phone: string }>>(
+      "/auth/phone/login/request-otp",
+      { phone },
+    );
+    return res.data;
+  },
+
+  /** Phone sign-in — step 2. Verifies the code → sets the JWT cookie. */
+  async verifyPhoneLoginOtp(input: { phone: string; otp: string }): Promise<Session> {
+    const res = await api.post<EnvelopedResponse<{ user: unknown }>>(
+      "/auth/phone/login/verify-otp",
+      input,
+    );
+    return { user: normalizeUser(res.data.user) };
+  },
+
+  /**
+   * Ownership verification — step 1. Sends a code to any mobile (registration /
+   * guest checkout / profile phone-change). No session is created.
+   */
+  async sendPhoneOtp(phone: string, purpose: "verify" | "update" = "verify"): Promise<{ phone: string }> {
+    const res = await api.post<EnvelopedResponse<{ phone: string }>>("/auth/phone/send-otp", {
+      phone,
+      purpose,
+    });
+    return res.data;
+  },
+
+  /**
+   * Ownership verification — step 2. Verifies the code → returns a short-lived
+   * proof token a later write presents to prove the number was verified.
+   */
+  async verifyPhoneOtp(input: {
+    phone: string;
+    otp: string;
+    purpose?: "verify" | "update";
+  }): Promise<{ phone: string; phoneVerifyToken: string }> {
+    const res = await api.post<EnvelopedResponse<{ phone: string; phoneVerifyToken: string }>>(
+      "/auth/phone/verify",
+      input,
+    );
+    return res.data;
+  },
+
+  /** Save a verified phone on the signed-in account (profile phone-change). */
+  async updatePhone(input: { phone: string; phoneVerifyToken: string }): Promise<{ phoneNumber: string }> {
+    const res = await api.patch<EnvelopedResponse<{ user: { phoneNumber: string } }>>(
+      "/users/me/phone",
+      input,
+    );
+    return res.data.user;
   },
 };

@@ -1,28 +1,10 @@
-import { Link, createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
-import { ForgotPasswordForm } from "@/features/auth/components/ForgotPasswordForm";
-
+// Passwordless migration: there are no passwords to recover. Sign-in is a
+// one-time email code, so /forgot-password redirects to the unified /login.
 export const Route = createFileRoute("/_auth/forgot-password")({
-  component: ForgotPasswordRoute,
+  beforeLoad: () => {
+    throw redirect({ to: "/login" });
+  },
+  component: () => null,
 });
-
-function ForgotPasswordRoute() {
-  return (
-    <div className="space-y-6">
-      <header className="space-y-2">
-        <h1 className="font-display text-3xl text-foreground">Reset password</h1>
-        <p className="text-sm text-muted-foreground">
-          Enter the email tied to your account and we'll send a reset link.
-        </p>
-      </header>
-
-      <ForgotPasswordForm />
-
-      <p className="text-center text-xs">
-        <Link to="/login" className="text-muted-foreground hover:text-foreground">
-          Back to sign in
-        </Link>
-      </p>
-    </div>
-  );
-}

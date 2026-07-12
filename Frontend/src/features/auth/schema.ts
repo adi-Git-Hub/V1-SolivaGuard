@@ -16,6 +16,18 @@ export const loginSchema = z.object({
 });
 export type LoginInput = z.infer<typeof loginSchema>;
 
+// Passwordless sign-in (unified login + signup via email OTP).
+// Step 1 collects the email; step 2 collects the 6-digit code.
+export const requestOtpSchema = z.object({
+  email: z.string().email("Enter a valid email"),
+});
+export type RequestOtpInput = z.infer<typeof requestOtpSchema>;
+
+export const otpCodeSchema = z.object({
+  otp: z.string().regex(/^\d{6}$/, "Enter the 6-digit code"),
+});
+export type OtpCodeInput = z.infer<typeof otpCodeSchema>;
+
 export const registerSchema = z
   .object({
     name: z.string().min(2, "Tell us your name"),

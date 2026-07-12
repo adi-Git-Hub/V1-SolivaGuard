@@ -60,6 +60,35 @@ export const orderEventSchema = z.object({
 });
 export type OrderEvent = z.infer<typeof orderEventSchema>;
 
+// Refund lifecycle, independent of orderStatus (an order can be `cancelled`
+// while its money is still `processing`). Drives the refund badge.
+export const refundStatusEnum = z.enum([
+  "not_applicable",
+  "pending",
+  "processing",
+  "completed",
+  "failed",
+]);
+export type RefundStatus = z.infer<typeof refundStatusEnum>;
+
+export const cancellationSchema = z.object({
+  reason: z.string().optional(),
+  detail: z.string().optional(),
+  cancelledAt: z.string().optional(),
+  cancelledBy: z.string().optional(),
+});
+export type Cancellation = z.infer<typeof cancellationSchema>;
+
+export const refundSchema = z.object({
+  required: z.boolean().optional(),
+  status: refundStatusEnum.optional(),
+  refundId: z.string().optional(),
+  amount: z.number().optional(),
+  initiatedAt: z.string().optional(),
+  completedAt: z.string().optional(),
+});
+export type Refund = z.infer<typeof refundSchema>;
+
 export const orderSchema = z.object({
   id: z.string(),
   _id: z.string().optional(),
@@ -73,6 +102,8 @@ export const orderSchema = z.object({
   totalPrice: z.number(),
   orderStatus: orderStatusEnum,
   events: z.array(orderEventSchema).optional().default([]),
+  cancellation: cancellationSchema.optional(),
+  refund: refundSchema.optional(),
   createdAt: z.string().optional(),
   deliveredAt: z.string().optional(),
   // Auto-generated documents
@@ -85,6 +116,9 @@ export const orderSchema = z.object({
 export type Order = z.infer<typeof orderSchema>;
 
 export const createOrderInputSchema = z.object({
+  // Guest checkout only — the account a guest order attaches to. Ignored by
+  // the backend for an authenticated request.
+  guestEmail: z.string().email().optional(),
   shippingInfo: shippingInfoSchema,
   orderItems: z.array(orderItemSchema).min(1),
   itemsPrice: z.number().nonnegative(),

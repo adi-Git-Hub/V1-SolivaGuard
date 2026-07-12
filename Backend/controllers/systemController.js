@@ -4,6 +4,24 @@ const { queues } = require('../queues/queueManager');
 const catchAsyncErrors = require('../middleware/catchAsyncErrors');
 const sendResponse = require('../utils/sendResponse');
 const os = require('os');
+const { isConfigured: isPhoneOtpConfigured } = require('../config/msg91');
+
+/**
+ * @desc    Public runtime feature flags for the frontend.
+ * @route   GET /api/v1/system/config
+ * @access  Public
+ *
+ * `phoneOtpEnabled` flips to true automatically once MSG91 credentials are set
+ * and the backend restarts — the frontend reveals its Phone OTP affordances
+ * only when this is true, so no frontend rebuild is needed to go live.
+ */
+exports.getPublicConfig = catchAsyncErrors(async (req, res, next) => {
+  return sendResponse(res, {
+    data: {
+      phoneOtpEnabled: isPhoneOtpConfigured(),
+    },
+  });
+});
 
 /**
  * @desc    System Health Check

@@ -3,12 +3,17 @@ const Order = require('../models/orderModel');
 const Product = require('../models/productModel');
 const Cart = require('../models/cartModel');
 const paymentService = require('./paymentService');
+const authService = require('./authService');
 const ErrorHandler = require('../utils/errorHandler');
 const logger = require('../utils/logger');
 const { enqueuePaymentRecovery } = require('../queues/paymentQueue');
 const { enqueueInventoryRecovery } = require('../queues/inventoryQueue');
 const { enqueueEmail } = require('../queues/emailQueue');
-const { getOrderConfirmationTemplate } = require('../utils/emailTemplates');
+const {
+  getOrderConfirmationTemplate,
+  getOrderCancellationCustomerTemplate,
+  getOrderCancellationAdminTemplate,
+} = require('../utils/emailTemplates');
 const { generateOrderDocuments } = require('./pdfService');
 const User = require('../models/userModel');
 
@@ -48,7 +53,19 @@ class OrderService {
         }
       }
 
-      const { shippingInfo, orderItems, taxPrice, shippingPrice } = data;
+      const { shippingInfo, orderItems, taxPrice, shippingPrice, guestEmail } = data;
+
+      // Single code path for authenticated + guest checkout: an authenticated
+      // request already has userId; a guest request resolves (or creates) the
+      // account its order attaches to from guestEmail.
+      let resolvedUserId = userId;
+      if (!resolvedUserId) {
+        if (!guestEmail) {
+          throw new ErrorHandler('Email is required to place an order', 400);
+        }
+        const guestUser = await authService.findOrCreateGuestUser(guestEmail, shippingInfo);
+        resolvedUserId = guestUser._id;
+      }
 
       let serverItemsPrice = 0;
       const safeOrderItems = [];
@@ -101,7 +118,7 @@ class OrderService {
         events: [
           { status: 'pending', message: 'Order created and awaiting payment' }
         ],
-        user: userId,
+        user: resolvedUserId,
         idempotencyKey,
       };
 
@@ -114,14 +131,14 @@ class OrderService {
       }
 
       await Cart.findOneAndUpdate(
-        { user: userId },
+        { user: resolvedUserId },
         { $set: { cartItems: [], totalPrice: 0 } },
         sessionOpt
       );
 
       if (session) { await session.commitTransaction(); session.endSession(); }
 
-      logger.info(`[ORDER] New Order Created: ${createdOrder._id} for User: ${userId}`);
+      logger.info(`[ORDER] New Order Created: ${createdOrder._id} for User: ${resolvedUserId}`);
 
       try {
         await enqueueInventoryRecovery(createdOrder._id, orderItems, 15 * 60 * 1000);
@@ -263,7 +280,16 @@ class OrderService {
     return await Order.find({ user: userId });
   }
 
-  async cancelOrder(orderId, userId) {
+  // Statuses a customer may still cancel from. Business rule: cancellation is
+  // allowed ONLY before the order is packed. Once packed/shipped/etc the button
+  // is hidden on the client AND rejected here so the two can never drift.
+  static get CUSTOMER_CANCELLABLE_STATES() {
+    return ['pending', 'confirmed', 'paid'];
+  }
+
+  async cancelOrder(orderId, userId, options = {}) {
+    const { reason, detail } = options;
+
     const order = await Order.findById(orderId);
     if (!order) {
       throw new ErrorHandler('Order not found', 404);
@@ -273,23 +299,167 @@ class OrderService {
       throw new ErrorHandler('You are not authorized to cancel this order', 403);
     }
 
-    const validCancelStates = ['pending', 'confirmed', 'paid', 'packed'];
-    if (!validCancelStates.includes(order.orderStatus)) {
-      throw new ErrorHandler(`Cannot cancel order in ${order.orderStatus} state`, 400);
+    if (order.orderStatus === 'cancelled') {
+      throw new ErrorHandler('This order has already been cancelled', 400, 'ALREADY_CANCELLED');
     }
 
-    for (const item of order.orderItems) {
-      await Product.findByIdAndUpdate(
-        item.product,
-        { $inc: { stock: item.quantity } }
+    if (!OrderService.CUSTOMER_CANCELLABLE_STATES.includes(order.orderStatus)) {
+      throw new ErrorHandler(
+        `This order can no longer be cancelled once it has reached the ${order.orderStatus.replace(/_/g, ' ')} stage.`,
+        400,
+        'CANCELLATION_NOT_ALLOWED',
       );
     }
 
+    // Restore stock for real catalogue products (synthetic showcase ids no-op).
+    for (const item of order.orderItems) {
+      await Product.findByIdAndUpdate(item.product, { $inc: { stock: item.quantity } });
+    }
+
+    const now = new Date();
+    const wasPaid = order.paymentInfo?.status === 'paid';
+
     order.orderStatus = 'cancelled';
+    order.cancellation = {
+      reason: reason || 'Not specified',
+      detail: detail || '',
+      cancelledAt: now,
+      cancelledBy: 'customer',
+    };
+
+    // Auto-refund: only for paid orders with a captured payment. Never let a
+    // refund-API failure block the cancellation itself — flag it for manual
+    // follow-up instead.
+    if (wasPaid && order.paymentInfo?.razorpay_payment_id) {
+      order.refund = {
+        required: true,
+        status: 'processing',
+        amount: order.totalPrice,
+        initiatedAt: now,
+      };
+      try {
+        const refund = await paymentService.refundPayment(
+          order.paymentInfo.razorpay_payment_id,
+          order.totalPrice,
+          { reason: 'customer_cancellation', orderId: String(order._id) },
+        );
+        order.refund.refundId = refund?.id;
+        if (refund?.status === 'processed') {
+          order.refund.status = 'completed';
+          order.refund.completedAt = now;
+          order.paymentInfo.status = 'refunded';
+        } else if (refund?.status === 'failed') {
+          order.refund.status = 'failed';
+        } else {
+          order.refund.status = 'processing';
+        }
+      } catch (refundErr) {
+        logger.error(`[ORDER] Refund initiation failed for ${orderId}: ${refundErr.message}`);
+        // Money still owed — mark pending so ops can retry from the dashboard.
+        order.refund.status = 'pending';
+      }
+    } else {
+      order.refund = { required: false, status: 'not_applicable' };
+    }
+
+    // In-band activity log — the order timeline is the audit trail used across
+    // every other status transition.
+    order.events.push({
+      status: 'cancelled',
+      message: `Order cancelled by customer${reason ? ` — ${reason}` : ''}`,
+      timestamp: now,
+    });
+
     await order.save();
 
-    logger.info(`[ORDER] Order Cancelled and stock restored: ${orderId} by User: ${userId}`);
-    return true;
+    logger.info(
+      `[ORDER] Order Cancelled: ${orderId} by User: ${userId} ` +
+        `(refund: ${order.refund?.status}, stock restored)`,
+    );
+
+    // Admin + customer emails run out-of-band so a slow SMTP hop never delays
+    // the dashboard response, and a mail failure never fails the cancellation.
+    setImmediate(() => {
+      this.sendCancellationNotifications(order._id).catch((e) =>
+        logger.error(`[ORDER] Cancellation notifications failed for ${orderId}: ${e.message}`),
+      );
+    });
+
+    return order;
+  }
+
+  /**
+   * Fire the admin notice + customer confirmation emails for a cancelled order.
+   * Best-effort: each send is isolated so one failing never blocks the other.
+   */
+  async sendCancellationNotifications(orderId) {
+    const order = await Order.findById(orderId);
+    if (!order) return;
+    const user = await User.findById(order.user).select('name email');
+
+    const items = order.orderItems || [];
+    const productNames = items.map((i) => `${i.name} × ${i.quantity}`).join(', ') || '—';
+    const totalQty = items.reduce((sum, i) => sum + (i.quantity || 0), 0);
+    const reasonText = order.cancellation?.detail
+      ? `${order.cancellation.reason} — ${order.cancellation.detail}`
+      : order.cancellation?.reason;
+    const refundRequired = !!order.refund?.required;
+    const refundStatusLabel = {
+      not_applicable: 'Not applicable',
+      pending: 'Pending',
+      processing: 'Processing',
+      completed: 'Completed',
+      failed: 'Failed',
+    }[order.refund?.status] || 'Not applicable';
+    const shortOrderId = String(order._id).slice(-8).toUpperCase();
+
+    // 1) Notify the team.
+    try {
+      const adminEmail = process.env.CONTACT_EMAIL || 'admin@solivaguard.com';
+      const adminHtml = getOrderCancellationAdminTemplate({
+        customerName: user?.name || order.shippingInfo?.fullName || 'Customer',
+        customerEmail: user?.email || '—',
+        orderId: shortOrderId,
+        productName: productNames,
+        variant: 'N/A',
+        quantity: totalQty,
+        orderAmount: order.totalPrice,
+        paymentMethod: 'Razorpay',
+        paymentStatus: order.paymentInfo?.status || 'pending',
+        reason: reasonText,
+        refundRequired: refundRequired ? 'Yes' : 'No',
+        cancelledAt: order.cancellation?.cancelledAt,
+      });
+      await enqueueEmail('orderCancellationAdmin', {
+        email: adminEmail,
+        subject: `Order Cancelled — #${shortOrderId}`,
+        html: adminHtml,
+      });
+    } catch (e) {
+      logger.warn(`[ORDER] Admin cancellation email skipped: ${e.message}`);
+    }
+
+    // 2) Confirm to the customer.
+    try {
+      if (user?.email) {
+        const customerHtml = getOrderCancellationCustomerTemplate({
+          customerName: order.shippingInfo?.fullName || user.name,
+          orderId: order._id,
+          orderItems: items,
+          totalPrice: order.totalPrice,
+          reason: reasonText,
+          refundRequired,
+          refundStatusLabel,
+        });
+        await enqueueEmail('orderCancellation', {
+          email: user.email,
+          subject: 'Your Soliva Order Has Been Cancelled',
+          html: customerHtml,
+        });
+      }
+    } catch (e) {
+      logger.warn(`[ORDER] Customer cancellation email skipped: ${e.message}`);
+    }
   }
 
   async getAllOrders() {

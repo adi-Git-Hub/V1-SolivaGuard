@@ -27,6 +27,44 @@ const authValidator = {
     }),
   }),
 
+  // Passwordless sign-in (unified login + signup).
+  requestOtp: z.object({
+    body: z.object({
+      email: z.string().email('Invalid email format'),
+    }),
+  }),
+
+  verifyOtp: z.object({
+    body: z.object({
+      email: z.string().email('Invalid email format'),
+      otp: z.string().regex(/^\d{6}$/, 'Enter the 6-digit code'),
+    }),
+  }),
+
+  checkEmail: z.object({
+    body: z.object({
+      email: z.string().email('Invalid email format'),
+    }),
+  }),
+
+  createPassword: z.object({
+    body: z.object({
+      email: z.string().email('Invalid email format'),
+      otp: z.string().regex(/^\d{6}$/, 'Enter the 6-digit code'),
+      password: z.string()
+        .min(12, 'Password must be at least 12 characters')
+        .regex(/^(?=.*[a-zA-Z])(?=.*\d)(?=.*[@$!%*?&]).{12,}$/, 'Password must contain letters, numbers, and special characters'),
+    }),
+  }),
+
+  // Self-service account deletion — OTP only; the email comes from the
+  // authenticated session, never the body.
+  deleteAccount: z.object({
+    body: z.object({
+      otp: z.string().regex(/^\d{6}$/, 'Enter the 6-digit code'),
+    }),
+  }),
+
   forgotPassword: z.object({
     body: z.object({
       email: z.string().email('Invalid email format'),

@@ -52,3 +52,16 @@ export const api = {
   patch: <T>(path: string, body?: unknown) => request<T>(path, { method: "PATCH", body }),
   delete: <T>(path: string) => request<T>(path, { method: "DELETE" }),
 };
+
+// Backend-served upload (avatars, invoices) → always resolve against the
+// CONFIGURED API origin, so the protocol/host match the environment. Older
+// records may store a stale dev host or an http:// URL that a mobile/HTTPS page
+// would block as mixed content; we keep only the `/uploads/...` path and
+// re-prefix it with VITE_API_URL's origin.
+export function assetUrl(u?: string | null): string | null {
+  if (!u) return null;
+  const s = String(u);
+  const origin = (env.VITE_API_URL || "").replace(/\/api\/v1\/?$/, "");
+  const m = s.match(/\/uploads\/.+$/);
+  return m ? `${origin}${m[0]}` : s;
+}

@@ -1,14 +1,42 @@
 import { Link } from "@tanstack/react-router";
 import { motion } from "framer-motion";
-import { ArrowLeft, FileText, Receipt, MapPin, CreditCard, Package, ArrowRight } from "lucide-react";
+import { ArrowLeft, FileText, Receipt, MapPin, CreditCard, Package, ArrowRight, XCircle, RefreshCw } from "lucide-react";
 
 import { documentUrl } from "@/features/orders/api";
-import type { Order } from "@/features/orders/schema";
+import type { Order, RefundStatus } from "@/features/orders/schema";
 import { OrderTimeline, trackingLabel, statusTone } from "@/features/orders/components/OrderTimeline";
+import { RequestRefundButton } from "@/features/orders/components/RefundRequestModal";
 import { ease } from "@/design-system";
 
 const inr = (n: number) =>
   "₹" + Number(n || 0).toLocaleString("en-IN", { maximumFractionDigits: 2 });
+
+const dateTime = (iso?: string | null) =>
+  iso
+    ? new Date(iso).toLocaleString("en-IN", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : "—";
+
+const REFUND_LABEL: Record<RefundStatus, string> = {
+  not_applicable: "Not applicable",
+  pending: "Pending",
+  processing: "Processing",
+  completed: "Completed",
+  failed: "Failed",
+};
+const refundColor = (s: RefundStatus) =>
+  s === "completed"
+    ? "text-emerald-700"
+    : s === "processing" || s === "pending"
+      ? "text-yellow-700"
+      : s === "failed"
+        ? "text-red-600"
+        : "text-ink-muted";
 
 const variantOf = (name: string) => (name.includes("—") ? name.split("—").pop()?.trim() : "");
 
@@ -55,21 +83,34 @@ function Row({ k, v }: { k: string; v: string }) {
  *   • /track/:orderId          (mode="track"   — adds "View Full Order Details")
  *   • /profile/orders/:id      (mode="details")
  */
-export function OrderExperience({ order, mode = "details" }: { order: Order; mode?: "track" | "details" }) {
+export function OrderExperience({
+  order,
+  mode = "details",
+}: {
+  order: Order;
+  mode?: "track" | "details" | "modal";
+}) {
   const ship = order.shippingInfo;
   const invoiceHref = documentUrl(order.invoiceUrl);
   const receiptHref = documentUrl(order.receiptUrl);
   const customerEmail = typeof order.user === "object" ? (order.user as any)?.email : undefined;
   const isTrack = mode === "track";
+  const isModal = mode === "modal";
+  const refundStatus = order.refund?.status ?? "not_applicable";
+  const showCancellation =
+    order.orderStatus === "cancelled" || refundStatus !== "not_applicable";
 
   return (
-    <div className="mx-auto max-w-3xl px-5 sm:px-8 pt-28 md:pt-32">
-      <Link
-        to="/profile"
-        className="mb-6 inline-flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.16em] text-ink-muted hover:text-orange-glow"
-      >
-        <ArrowLeft className="h-4 w-4" /> My Orders
-      </Link>
+    <div className={`mx-auto max-w-3xl ${isModal ? "px-0 pt-0" : "px-5 sm:px-8 pt-28 md:pt-32"}`}>
+      {/* Standalone pages get a back link; the modal has its own back button. */}
+      {!isModal && (
+        <Link
+          to="/profile"
+          className="mb-6 inline-flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.16em] text-ink-muted hover:text-orange-glow"
+        >
+          <ArrowLeft className="h-4 w-4" /> My Orders
+        </Link>
+      )}
 
       <motion.div
         initial={{ opacity: 0, y: 14 }}
@@ -125,6 +166,102 @@ export function OrderExperience({ order, mode = "details" }: { order: Order; mod
       </div>
 
       <div className="space-y-6">
+        {/* Cancellation & Refund — only when the order was cancelled or a
+            refund is in flight. Shown high up so it's the first thing seen. */}
+        {showCancellation && (
+          <div className="rounded-3xl border border-red-500/20 bg-red-500/[0.04] p-6 sm:p-7 shadow-[0_24px_60px_-44px_rgba(58,42,34,0.5)]">
+            <h2 className="mb-4 flex items-center gap-2 font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-red-600">
+              <XCircle className="h-4 w-4" /> Cancellation &amp; Refund
+            </h2>
+
+            {order.orderStatus === "cancelled" && (
+              <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
+                <Summary k="Cancelled On" v={dateTime(order.cancellation?.cancelledAt)} />
+                <Summary
+                  k="Cancelled By"
+                  v={order.cancellation?.cancelledBy === "admin" ? "Soliva Team" : "You"}
+                />
+                <div className="sm:col-span-2">
+                  <p className="mb-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-ink-muted font-bold">
+                    Reason
+                  </p>
+                  <p className="text-[13px] font-semibold text-brown-deep break-words">
+                    {order.cancellation?.detail
+                      ? `${order.cancellation.reason} — ${order.cancellation.detail}`
+                      : order.cancellation?.reason || "Not specified"}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {refundStatus !== "not_applicable" && (
+              <div className="mt-4 rounded-2xl border border-line-soft bg-white/70 p-4">
+                <div className="mb-3 flex items-center gap-2">
+                  <RefreshCw className="h-3.5 w-3.5 text-orange-glow" />
+                  <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-ink-muted">
+                    Refund
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 gap-x-6 gap-y-3 text-[13px] sm:grid-cols-2">
+                  <div className="flex items-center justify-between sm:block">
+                    <span className="text-ink-muted">Status</span>
+                    <span className={`font-semibold sm:mt-0.5 sm:block ${refundColor(refundStatus)}`}>
+                      {REFUND_LABEL[refundStatus]}
+                    </span>
+                  </div>
+                  {order.refund?.amount != null && (
+                    <div className="flex items-center justify-between sm:block">
+                      <span className="text-ink-muted">Amount</span>
+                      <span className="font-semibold text-brown-deep sm:mt-0.5 sm:block">
+                        {inr(order.refund.amount)}
+                      </span>
+                    </div>
+                  )}
+                  {order.refund?.initiatedAt && (
+                    <div className="flex items-center justify-between sm:block">
+                      <span className="text-ink-muted">Initiated</span>
+                      <span className="text-brown-deep sm:mt-0.5 sm:block">
+                        {dateTime(order.refund.initiatedAt)}
+                      </span>
+                    </div>
+                  )}
+                  {order.refund?.completedAt && (
+                    <div className="flex items-center justify-between sm:block">
+                      <span className="text-ink-muted">Completed</span>
+                      <span className="text-brown-deep sm:mt-0.5 sm:block">
+                        {dateTime(order.refund.completedAt)}
+                      </span>
+                    </div>
+                  )}
+                  {order.refund?.refundId && (
+                    <div className="sm:col-span-2">
+                      <span className="text-ink-muted">Refund ID</span>
+                      <span className="mt-0.5 block break-all font-mono text-[11px] text-brown-deep">
+                        {order.refund.refundId}
+                      </span>
+                    </div>
+                  )}
+                </div>
+                <p className="mt-3 text-[12px] leading-relaxed text-ink-muted">
+                  Refunds are generally processed within 5–7 business days, depending on your payment
+                  method.
+                </p>
+              </div>
+            )}
+
+            {/* Request Refund — raise a refund request with transaction details + screenshot */}
+            <div className="mt-5 border-t border-red-500/10 pt-4">
+              <p className="text-[12px] leading-relaxed text-ink-muted">
+                Didn&apos;t receive your refund, or need help with it? Raise a request with your
+                transaction ID and a payment screenshot.
+              </p>
+              <div className="mt-3">
+                <RequestRefundButton order={order} />
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Order Summary */}
         <Card title="Order Summary" icon={FileText}>
           <div className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3">

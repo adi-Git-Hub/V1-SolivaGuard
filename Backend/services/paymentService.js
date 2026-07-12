@@ -35,6 +35,36 @@ class PaymentService {
     }
   }
 
+  /**
+   * Initiate a refund against a captured Razorpay payment.
+   * @param {string} razorpay_payment_id  The payment to refund (pay_...).
+   * @param {number} amount               Amount in RUPEES (converted to paise here).
+   * @param {object} [notes]              Optional key/value notes stored on the refund.
+   * @returns {Promise<object>} Razorpay refund object ({ id, status, ... }).
+   *          status is one of 'pending' | 'processed' | 'failed'.
+   */
+  async refundPayment(razorpay_payment_id, amount, notes = {}) {
+    if (!process.env.RAZORPAY_KEY_ID || process.env.RAZORPAY_KEY_ID === 'dummy_id') {
+      throw new Error('Razorpay credentials are required in production');
+    }
+    if (!razorpay_payment_id) {
+      throw new Error('A Razorpay payment id is required to issue a refund');
+    }
+
+    try {
+      const refund = await this.razorpayInstance.payments.refund(razorpay_payment_id, {
+        amount: Math.round(amount * 100),
+        speed: 'normal',
+        notes,
+      });
+      logger.info(`[PAYMENT] Refund initiated: ${refund.id} (${refund.status}) for payment ${razorpay_payment_id}`);
+      return refund;
+    } catch (error) {
+      logger.error(`[PAYMENT] Refund failed for payment ${razorpay_payment_id}: ${error.message}`);
+      throw error;
+    }
+  }
+
   verifySignature(razorpay_order_id, razorpay_payment_id, razorpay_signature) {
     if (!process.env.RAZORPAY_KEY_SECRET || process.env.RAZORPAY_KEY_SECRET === 'dummy_secret') {
        throw new Error('Razorpay secret is not configured');

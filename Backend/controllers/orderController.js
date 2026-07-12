@@ -5,10 +5,10 @@ const sendResponse = require('../utils/sendResponse');
 
 // @desc    Create new order & Razorpay order
 // @route   POST /api/v1/orders
-// @access  Private
+// @access  Private or guest (see attachUserIfPresent in orderRoutes)
 exports.newOrder = catchAsyncErrors(async (req, res, next) => {
   const idempotencyKey = req.headers['x-idempotency-key'];
-  const result = await orderService.createOrder(req.body, req.user.id, idempotencyKey);
+  const result = await orderService.createOrder(req.body, req.user ? req.user.id : null, idempotencyKey);
 
   return sendResponse(res, {
     statusCode: 201,
@@ -18,7 +18,7 @@ exports.newOrder = catchAsyncErrors(async (req, res, next) => {
 
 // @desc    Verify Razorpay Payment
 // @route   POST /api/v1/orders/verify-payment
-// @access  Private
+// @access  Private or guest (see attachUserIfPresent in orderRoutes)
 exports.verifyPayment = catchAsyncErrors(async (req, res, next) => {
   await orderService.verifyPayment(req.body);
 
@@ -57,10 +57,14 @@ exports.myOrders = catchAsyncErrors(async (req, res, next) => {
 // @route   PUT /api/v1/orders/:id/cancel
 // @access  Private
 exports.cancelOrder = catchAsyncErrors(async (req, res, next) => {
-  await orderService.cancelOrder(req.params.id, req.user.id);
+  const order = await orderService.cancelOrder(req.params.id, req.user.id, {
+    reason: req.body?.reason,
+    detail: req.body?.detail,
+  });
 
   return sendResponse(res, {
     message: 'Order cancelled successfully',
+    data: { order },
   });
 });
 

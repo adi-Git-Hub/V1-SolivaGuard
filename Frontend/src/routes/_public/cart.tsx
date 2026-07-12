@@ -1,12 +1,10 @@
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
-import { toast } from "sonner";
 import { ShoppingBag } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { CartLineItem } from "@/features/cart/components/CartLineItem";
 import { CartSummary } from "@/features/cart/components/CartSummary";
 import { useCart } from "@/features/cart/hooks/useCart";
-import { useSession } from "@/features/auth/hooks/useSession";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { useCheckoutStore } from "@/features/checkout/store";
 
@@ -16,15 +14,12 @@ export const Route = createFileRoute("/_public/cart")({
 
 function CartRoute() {
   const { lines, subtotalCents } = useCart();
-  const session = useSession();
   const navigate = useNavigate();
   const setCheckoutItems = useCheckoutStore((s) => s.setItems);
 
   function onCheckout() {
-    if (!session?.user) {
-      toast.message("Sign in to continue to checkout");
-      return;
-    }
+    // Guests go straight to checkout — Contact Information there handles the
+    // silent email check and Welcome Back/Sign In branching inline.
     setCheckoutItems(
       lines.map((l) => ({
         productId: l.productId,

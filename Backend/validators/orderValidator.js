@@ -3,6 +3,9 @@ const { z } = require('zod');
 const orderValidator = {
   createOrder: z.object({
     body: z.object({
+      // Guest checkout only — required by orderService.createOrder when there's
+      // no authenticated session. Ignored for logged-in orders.
+      guestEmail: z.string().email('Invalid email format').optional(),
       shippingInfo: z.object({
         fullName: z.string().min(2, 'Full name is required'),
         phone: z.string().regex(/^[6-9]\d{9}$/, 'Invalid phone number'),
@@ -49,6 +52,21 @@ const orderValidator = {
   }),
 
   getOrderById: z.object({
+    params: z.object({
+      id: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid Order ID'),
+    }),
+  }),
+
+  cancelOrder: z.object({
+    body: z
+      .object({
+        reason: z.string().min(1, 'A cancellation reason is required').max(120),
+        detail: z.string().max(250, 'Reason cannot exceed 250 characters').optional(),
+      })
+      .refine((d) => d.reason !== 'Other' || (d.detail && d.detail.trim().length > 0), {
+        message: 'Please tell us your reason',
+        path: ['detail'],
+      }),
     params: z.object({
       id: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid Order ID'),
     }),

@@ -71,6 +71,35 @@ const orderSchema = new mongoose.Schema(
     ],
     deliveredAt: Date,
 
+    // ── Cancellation (customer- or admin-initiated) ──
+    // Populated when an order is cancelled. `reason` is the selected label;
+    // `detail` holds the free-text note captured when the reason is "Other".
+    cancellation: {
+      reason: { type: String },
+      detail: { type: String },
+      cancelledAt: { type: Date },
+      cancelledBy: {
+        type: String,
+        enum: ['customer', 'admin', 'system'],
+      },
+    },
+
+    // ── Refund tracking ──
+    // Independent of orderStatus: an order can be `cancelled` while its money
+    // is still `processing`. `status` drives the refund badge on the dashboard.
+    refund: {
+      required: { type: Boolean, default: false },
+      status: {
+        type: String,
+        enum: ['not_applicable', 'pending', 'processing', 'completed', 'failed'],
+        default: 'not_applicable',
+      },
+      refundId: { type: String }, // Razorpay refund id (rfnd_...)
+      amount: { type: Number }, // rupees
+      initiatedAt: { type: Date },
+      completedAt: { type: Date },
+    },
+
     // ── Auto-generated documents (Phase 2/7) — permanent references. ──
     invoiceNumber: { type: String },
     receiptNumber: { type: String },

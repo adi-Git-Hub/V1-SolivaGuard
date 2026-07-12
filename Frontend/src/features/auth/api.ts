@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { authClient } from "@/lib/auth-client";
 import { cartKeys, mergeGuestCartIntoServer } from "@/features/cart/api";
@@ -40,6 +40,37 @@ export function useLogin() {
       qc.invalidateQueries({ queryKey: sessionQueryKey });
       await mergeGuestCartSafely(qc);
     },
+  });
+}
+
+// ── Passwordless sign-in (unified login + signup via email OTP) ──
+
+export function useRequestOtp() {
+  // Step 1: only sends the code email; no session change, so nothing to
+  // invalidate. The component moves to the code-entry step on success.
+  return useMutation({
+    mutationFn: (email: string) => authClient.requestOtp(email),
+  });
+}
+
+export function useVerifyOtp() {
+  const qc = useQueryClient();
+  return useMutation({
+    // Step 2: creates/refreshes the session cookie (existing user OR brand-new
+    // auto-created account) → refresh session + merge guest cart, like useLogin.
+    mutationFn: (input: { email: string; otp: string }) => authClient.verifyOtp(input),
+    onSuccess: async (session) => {
+      qc.setQueryData(sessionQueryKey, session);
+      qc.invalidateQueries({ queryKey: sessionQueryKey });
+      await mergeGuestCartSafely(qc);
+    },
+  });
+}
+
+export function useCheckEmail() {
+  // Silent lookup only — never changes the session, so nothing to invalidate.
+  return useMutation({
+    mutationFn: (email: string) => authClient.checkEmail(email),
   });
 }
 
@@ -119,6 +150,36 @@ export function useForgotPassword() {
   });
 }
 
+// ── Account deletion (soft-delete + anonymize, OTP-gated) ──
+
+export function useRequestAccountDeletionOtp() {
+  // Only emails the confirmation code; no session change to invalidate.
+  return useMutation({
+    mutationFn: () => authClient.requestAccountDeletionOtp(),
+  });
+}
+
+export function useDeleteAccount() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (otp: string) => {
+      await authClient.deleteAccount(otp);
+      // Clear the Firebase client session too (Google accounts) so no auth
+      // state lingers — mirrors useLogout.
+      try {
+        const { signOutFirebase } = await import("@/lib/firebase");
+        await signOutFirebase();
+      } catch {
+        /* backend session is already gone; ignore */
+      }
+    },
+    onSuccess: () => {
+      // The backend wiped every session — drop the local session immediately.
+      qc.setQueryData(sessionQueryKey, null);
+    },
+  });
+}
+
 export function useResetPassword() {
   const qc = useQueryClient();
   return useMutation({
@@ -132,6 +193,68 @@ export function useResetPassword() {
       qc.setQueryData(sessionQueryKey, session);
       qc.invalidateQueries({ queryKey: sessionQueryKey });
       await mergeGuestCartSafely(qc);
+    },
+  });
+}
+
+// ── Phone OTP (MSG91) ────────────────────────────────────────────────────────
+
+// Public runtime flags. `phoneOtpEnabled` is false until MSG91 credentials are
+// set on the backend, so every phone-OTP UI affordance stays hidden until then.
+export function usePublicConfig() {
+  return useQuery({
+    queryKey: ["system", "config"],
+    queryFn: () => authClient.getPublicConfig(),
+    staleTime: 5 * 60_000,
+    retry: false,
+  });
+}
+
+// Phone sign-in (existing accounts). Step 1 sends the code; step 2 verifies and
+// creates the session (same onSuccess as email OTP — refresh session, merge cart).
+export function useRequestPhoneLoginOtp() {
+  return useMutation({
+    mutationFn: (phone: string) => authClient.requestPhoneLoginOtp(phone),
+  });
+}
+
+export function useVerifyPhoneLoginOtp() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { phone: string; otp: string }) => authClient.verifyPhoneLoginOtp(input),
+    onSuccess: async (session) => {
+      qc.setQueryData(sessionQueryKey, session);
+      qc.invalidateQueries({ queryKey: sessionQueryKey });
+      await mergeGuestCartSafely(qc);
+    },
+  });
+}
+
+// Ownership verification (registration / guest checkout / profile phone-change).
+// Step 1 sends the code; step 2 returns a proof token — neither touches session.
+export function useSendPhoneOtp() {
+  return useMutation({
+    mutationFn: (input: { phone: string; purpose?: "verify" | "update" }) =>
+      authClient.sendPhoneOtp(input.phone, input.purpose ?? "verify"),
+  });
+}
+
+export function useVerifyPhoneOtp() {
+  return useMutation({
+    mutationFn: (input: { phone: string; otp: string; purpose?: "verify" | "update" }) =>
+      authClient.verifyPhoneOtp(input),
+  });
+}
+
+// Save a verified phone on the signed-in account → refresh the session so the
+// new number shows immediately.
+export function useUpdatePhone() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { phone: string; phoneVerifyToken: string }) =>
+      authClient.updatePhone(input),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: sessionQueryKey });
     },
   });
 }

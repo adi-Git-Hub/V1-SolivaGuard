@@ -15,6 +15,13 @@ export type RazorpayHandlerResponse = {
   razorpay_signature: string;
 };
 
+// One payment instrument to show in a display block — e.g. { method: "card" }
+// or, to restrict UPI to just the QR flow, { method: "upi", flows: ["qr"] }.
+// Shape is intentionally loose (Record) since each Razorpay method accepts
+// different instrument properties (issuers/networks/types for card, banks
+// for netbanking, wallets for wallet, flows/apps for upi, etc).
+export type RazorpayPaymentInstrument = { method: string } & Record<string, unknown>;
+
 export type RazorpayOptions = {
   key: string;
   amount: number; // in paise / cents
@@ -23,10 +30,20 @@ export type RazorpayOptions = {
   description?: string;
   order_id: string;
   handler: (response: RazorpayHandlerResponse) => void;
-  prefill?: { name?: string; email?: string; contact?: string };
+  prefill?: { name?: string; email?: string; contact?: string; method?: string; vpa?: string };
   notes?: Record<string, string>;
   theme?: { color?: string };
   modal?: { ondismiss?: () => void };
+  // Restricts/reorders which payment methods Checkout shows. Docs:
+  // https://razorpay.com/docs/payments/payment-gateway/web-integration/standard/configure-payment-methods/understand-configuration/
+  config?: {
+    display: {
+      blocks: Record<string, { name: string; instruments: RazorpayPaymentInstrument[] }>;
+      sequence: string[];
+      preferences: { show_default_blocks: boolean };
+      hide?: RazorpayPaymentInstrument[];
+    };
+  };
 };
 
 export type RazorpayInstance = {

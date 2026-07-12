@@ -44,6 +44,48 @@ app.use(morgan(
 morgan.token('userId', (req) => req.user ? req.user.id : 'Guest');
 morgan.token('requestId', (req) => req.id);
 
+// CORS — FRONTEND_URL is a comma-separated allowlist so dev (5173 / 3000 / 8083)
+// and prod (Cloudflare Workers domain) can share one env var.
+// credentials:true is required for the httpOnly JWT cookie set by utils/jwtToken.js.
+const configuredOrigins = (process.env.FRONTEND_URL || 'http://localhost:5173,http://localhost:3000')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
+
+// Accept both the apex and the www. variant of every configured origin. A user
+// on https://www.example.com must not trip CORS against the apex API (and vice
+// versa) — otherwise the preflight is rejected and the browser reports the call
+// as an opaque "Failed to fetch".
+const allowedOrigins = new Set();
+for (const o of configuredOrigins) {
+  allowedOrigins.add(o);
+  try {
+    const u = new URL(o);
+    const host = u.host.startsWith('www.') ? u.host.slice(4) : `www.${u.host}`;
+    allowedOrigins.add(`${u.protocol}//${host}`);
+  } catch {
+    /* ignore malformed origin entries */
+  }
+}
+
+app.use(cors({
+  origin(origin, cb) {
+    // Allow same-origin / curl / server-to-server (no Origin header).
+    if (!origin) return cb(null, true);
+    // In development, accept any origin so the app works whether it's opened
+    // via localhost, a LAN IP, or the machine's public IP (e.g. a cloud VM).
+    if (process.env.NODE_ENV === 'development') return cb(null, true);
+    if (allowedOrigins.has(origin)) return cb(null, true);
+    // Reject WITHOUT throwing. Throwing here made the `cors` middleware hand the
+    // error to Express, which returned a 500 (with a stack trace) and NO
+    // Access-Control-Allow-Origin header — the browser surfaced that as a
+    // confusing "Failed to fetch". cb(null, false) omits the CORS headers so the
+    // browser blocks the request with a clean, correct CORS error instead.
+    return cb(null, false);
+  },
+  credentials: true,
+}));
+
 // Set security HTTP headers
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" }
@@ -77,27 +119,6 @@ const generalLimiter = rateLimit({
   message: 'Too many requests from this IP, please try again later',
 });
 app.use('/api', generalLimiter);
-
-// CORS — FRONTEND_URL is a comma-separated allowlist so dev (5173 / 3000 / 8083)
-// and prod (Cloudflare Workers domain) can share one env var.
-// credentials:true is required for the httpOnly JWT cookie set by utils/jwtToken.js.
-const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:5173,http://localhost:3000')
-  .split(',')
-  .map((s) => s.trim())
-  .filter(Boolean);
-
-app.use(cors({
-  origin(origin, cb) {
-    // Allow same-origin / curl / server-to-server (no Origin header).
-    if (!origin) return cb(null, true);
-    // In development, accept any origin so the app works whether it's opened
-    // via localhost, a LAN IP, or the machine's public IP (e.g. a cloud VM).
-    if (process.env.NODE_ENV === 'development') return cb(null, true);
-    if (allowedOrigins.includes(origin)) return cb(null, true);
-    return cb(new Error(`CORS: origin ${origin} not allowed`));
-  },
-  credentials: true,
-}));
 
 app.use(express.json({
   limit: '10kb',
