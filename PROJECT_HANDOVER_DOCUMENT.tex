@@ -1,0 +1,925 @@
+% =========================================================
+%  PROJECT COMPLETION & HANDOVER DOCUMENT - Soliva
+%  Compile with:  pdflatex PROJECT_HANDOVER_DOCUMENT.tex
+%  (run twice so the Table of Contents fills in)
+% =========================================================
+\documentclass[11pt,a4paper]{article}
+
+% ---------- Packages ----------
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[margin=1in]{geometry}
+\usepackage{longtable}      % tables that span pages
+\usepackage{tabularx}       % auto-width columns
+\usepackage{booktabs}       % nicer table rules
+\usepackage{amssymb}        % \checkmark
+\usepackage{enumitem}       % compact lists
+\usepackage{fancyhdr}       % headers / footers
+\usepackage{xcolor}
+\usepackage{titlesec}
+\usepackage[htt]{hyphenat}  % allow hyphenation inside \texttt{}
+\usepackage[hidelinks]{hyperref}
+
+% ---------- Document metadata (EDIT THESE) ----------
+\newcommand{\ProjectName}{Soliva}
+\newcommand{\CompanyName}{~}                    % <-- fill in
+\newcommand{\TechnologyPartner}{~}              % <-- fill in
+\newcommand{\PreparedBy}{Technical Audit Team}
+\newcommand{\DocumentVersion}{1.1}
+\newcommand{\ProjectVersion}{1.0.0}
+\newcommand{\CompletionDate}{July 4, 2026}
+\newcommand{\DocumentDate}{July 4, 2026}
+
+% ---------- Header / Footer ----------
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small \ProjectName{} -- Project Handover Document}
+\fancyhead[R]{\small v\DocumentVersion}
+\fancyfoot[C]{\small Page \thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% ---------- Section styling ----------
+\titleformat{\section}
+  {\Large\bfseries}{\thesection.}{0.6em}{}
+\titlespacing*{\section}{0pt}{18pt}{8pt}
+
+% Signature line helper
+\newcommand{\siglabel}[1]{\textbf{#1:} \rule{7cm}{0.4pt}}
+
+% ---------- Notice / status box styling ----------
+\definecolor{boxbg}{gray}{0.94}
+\definecolor{boxrule}{gray}{0.35}
+
+% Official notice box: \noticebox{Title}{Body}
+\newcommand{\noticebox}[2]{%
+    \begin{center}
+    \fcolorbox{boxrule}{boxbg}{%
+        \parbox{0.90\textwidth}{%
+            \vspace{8pt}
+            \begin{center}\textbf{\large #1}\end{center}
+            \vspace{2pt}
+            \noindent\hspace{10pt}\parbox{\dimexpr\linewidth-20pt\relax}{#2}
+            \vspace{8pt}
+        }%
+    }%
+    \end{center}
+}
+
+\begin{document}
+
+% =========================================================
+% 1. COVER PAGE
+% =========================================================
+\begin{titlepage}
+    \centering
+    \vspace*{2cm}
+    {\Huge\bfseries PROJECT COMPLETION \\[0.4cm] \& HANDOVER DOCUMENT \par}
+    \vspace{1.5cm}
+    {\huge\bfseries \ProjectName \par}
+    \vspace{2cm}
+
+    \begin{tabular}{ll}
+        \textbf{Project Name:}       & \ProjectName        \\[4pt]
+        \textbf{Company Name:}       & \CompanyName        \\[4pt]
+        \textbf{Technology Partner:} & \TechnologyPartner  \\[4pt]
+        \textbf{Prepared By:}        & \PreparedBy         \\[4pt]
+        \textbf{Document Version:}   & \DocumentVersion    \\[4pt]
+        \textbf{Project Version:}    & \ProjectVersion     \\[4pt]
+        \textbf{Completion Date:}    & \CompletionDate     \\[4pt]
+        \textbf{Document Date:}      & \DocumentDate       \\
+    \end{tabular}
+
+    \vfill
+
+    \begin{minipage}{0.85\textwidth}
+        \centering
+        \textbf{Confidentiality Statement}\\[6pt]
+        \small This document contains proprietary and confidential information.
+        It is intended solely for the use of the client and authorized personnel.
+        No part of this document may be reproduced or distributed without
+        explicit written permission.
+    \end{minipage}
+
+    \vspace{1.5cm}
+\end{titlepage}
+
+% =========================================================
+% PROJECT DELIVERY & COMPLETION STATUS  (pre-TOC notice page)
+% =========================================================
+\phantomsection
+\addcontentsline{toc}{section}{Project Delivery \& Completion Status}
+\section*{Project Delivery \& Completion Status}
+
+This document is issued upon the successful completion of the software
+development and documentation activities undertaken for the
+\textbf{\ProjectName} project. All development deliverables described herein
+have been completed and verified against the repository audit, and the
+accompanying technical documentation has been prepared in full.
+
+The project is presently in the \textbf{Commercial Completion} phase. In
+accordance with the commercial terms agreed between the parties, the official
+Project Handover has not yet taken effect and shall become effective only
+upon completion of the agreed \textbf{75\% payment milestone}.
+
+Until such time as the aforementioned milestone has been fulfilled, this
+document shall be treated as a \textbf{Project Completion Report} and shall
+not be construed as a Project Acceptance Certificate. Source code ownership,
+final handover, administrative transfer, and final acceptance shall each
+become effective only upon fulfilment of the required payment milestone, as
+further described in the \emph{Terms \& Conditions} section of this document.
+
+We thank the client for their continued cooperation and look forward to
+concluding the final handover formalities upon commercial closure.
+
+\vspace{0.8cm}
+
+\begin{center}
+\fcolorbox{boxrule}{boxbg}{%
+    \parbox{0.90\textwidth}{%
+        \vspace{8pt}
+        \begin{center}\textbf{\large Current Project Status}\end{center}
+        \vspace{4pt}
+        \renewcommand{\arraystretch}{1.4}
+        \begin{center}
+        \begin{tabular}{@{}p{6.2cm}p{6.2cm}@{}}
+            \textbf{Project Development}   & Completed \\
+            \textbf{Documentation}         & Completed \\
+            \textbf{Commercial Completion} & Pending Payment Milestone \\
+            \textbf{Official Handover}     & Pending \\
+            \textbf{Client Acceptance}     & Pending \\
+            \textbf{Ownership Transfer}    & Pending \\
+            \midrule
+            \textbf{Project Status}        & \textbf{Awaiting 75\% Payment Milestone} \\
+        \end{tabular}
+        \end{center}
+        \vspace{6pt}
+    }%
+}
+\end{center}
+
+\newpage
+
+% =========================================================
+% 2. TABLE OF CONTENTS
+% =========================================================
+\tableofcontents
+\newpage
+
+% =========================================================
+% 3. EXECUTIVE SUMMARY
+% =========================================================
+\section{Executive Summary}
+The Soliva project is an e-commerce platform built with a React frontend and a
+Node.js/Express backend. The repository contains the source code for a
+public-facing storefront and an administrative dashboard. The codebase
+implements user authentication, product catalog viewing, shopping cart
+functionality, payment processing via Razorpay, and data persistence using
+MongoDB.
+
+% =========================================================
+% 4. PROJECT OVERVIEW
+% =========================================================
+\section{Project Overview}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Application Purpose:} An online retail application allowing
+          customers to purchase items and administrators to manage store data.
+    \item \textbf{Target Users:} General shoppers and platform administrators.
+    \item \textbf{Business Workflow:} Users browse products, add items to a
+          cart, and execute payments through Razorpay. Administrators access a
+          separate interface to manage inventory, track orders, and view
+          transaction data.
+    \item \textbf{Overall Functionality:} E-commerce storefront with product
+          listing, cart, checkout, payment gateway integration, and a
+          role-restricted admin panel.
+\end{itemize}
+
+% =========================================================
+% 5. PROJECT SCOPE
+% =========================================================
+\section{Project Scope}
+\subsection*{Completed Scope}
+\begin{itemize}[leftmargin=*]
+    \item Frontend client built with React, Tanstack Router, and Vite.
+    \item Backend API built with Express 5.
+    \item MongoDB database schemas for Users, Products, Orders, and associated models.
+    \item JWT and Firebase Admin based authentication.
+    \item Razorpay payment gateway integration.
+    \item Email dispatch using Nodemailer.
+    \item Containerization setup using Docker and Docker Compose.
+\end{itemize}
+
+\subsection*{Out of Scope}
+\begin{itemize}[leftmargin=*]
+    \item Live production server provisioning.
+    \item Domain name and SSL certificate procurement.
+\end{itemize}
+
+\subsection*{Future Enhancements}
+\begin{itemize}[leftmargin=*]
+    \item Not explicitly defined in the repository.
+\end{itemize}
+
+% =========================================================
+% 6. TECHNOLOGY STACK
+% =========================================================
+\section{Technology Stack}
+\begin{longtable}{@{}p{4.5cm}p{10cm}@{}}
+    \toprule
+    \textbf{Category} & \textbf{Technology} \\
+    \midrule
+    \endhead
+    Frontend            & React 19, TypeScript, Tanstack Router, Tanstack Query, Vite \\
+    Styling \& UI       & Tailwind CSS 4, Radix UI, Framer Motion, GSAP, Three.js \\
+    Backend             & Node.js, Express 5.0 \\
+    Database            & MongoDB (Mongoose) \\
+    Caching / Queues    & Redis (ioredis), BullMQ \\
+    Authentication      & JWT (JSON Web Tokens), bcryptjs, Firebase Admin \\
+    Payment Gateway     & Razorpay \\
+    Email Services      & Nodemailer (SMTP) \\
+    DevOps / CI/CD      & Docker, Docker Compose, GitHub Actions \\
+    Security Packages   & Helmet, express-rate-limit, cors, express-mongo-sanitize, xss-clean, hpp \\
+    \bottomrule
+\end{longtable}
+
+% =========================================================
+% 7. OVERALL SYSTEM ARCHITECTURE
+% =========================================================
+\section{Overall System Architecture}
+\subsection*{Request Lifecycle \& Flow}
+\begin{enumerate}[leftmargin=*]
+    \item \textbf{Frontend Flow:} The Vite-built React application handles
+          client-side routing via Tanstack Router and state via Zustand.
+          API requests are managed by Tanstack Query.
+    \item \textbf{API Flow:} The Express backend receives requests on port
+          5000, applies middleware (Helmet, CORS, Rate Limiting), and maps
+          them to controllers in the \texttt{routes} directory.
+    \item \textbf{Authentication Flow:} Controllers require JWT validation
+          middleware. The \texttt{/api/v1/admin} routes require an additional
+          role check (\texttt{authorizeRoles('admin')}).
+    \item \textbf{Database Flow:} Controllers interact with MongoDB using
+          Mongoose schemas.
+    \item \textbf{Payment Flow:} The backend calls Razorpay APIs to generate
+          order IDs, and a webhook/verification endpoint validates Razorpay
+          signatures to finalize orders.
+\end{enumerate}
+
+\begin{verbatim}
+[ Client Browser ]
+        |
+        v
+[ Nginx Reverse Proxy (Host) ]
+        |
+        +-----------------------------------+
+        |                                   |
+        v                                   v
+[ Frontend Container (Port 8080) ] [ Backend Container (Port 5000) ]
+                                            |
+                                            +--> [ Redis (Port 6379) ]
+                                            |
+                                            +--> [ MongoDB (Port 27017) ]
+                                            |
+                                            +--> [ Razorpay / SMTP APIs ]
+\end{verbatim}
+
+% =========================================================
+% 8. FOLDER STRUCTURE
+% =========================================================
+\section{Folder Structure}
+\begin{verbatim}
+the-final-Soliva/
++-- Backend/
+|   +-- config/          # Environment configuration loaders
+|   +-- controllers/     # Express route handlers
+|   +-- middleware/      # Express middleware (auth, error, tracing)
+|   +-- models/          # Mongoose schema definitions
+|   +-- queues/          # BullMQ worker and queue setup
+|   +-- routes/          # Express Router definitions
+|   +-- services/        # Service integrations (email, payment)
+|   +-- templates/       # HTML templates for emails
+|   +-- uploads/         # Static file storage directory
+|   +-- utils/           # Utility functions (logger, JWT generation)
+|   +-- Dockerfile       # Backend Docker image instructions
+|   +-- server.js        # Node.js entry point
++-- Frontend/
+|   +-- src/
+|   |   +-- components/  # React components (Radix UI, custom)
+|   |   +-- features/    # Feature-grouped React components
+|   |   +-- routes/      # Tanstack Router route definitions
+|   |   +-- styles/      # Global CSS and Tailwind directives
+|   +-- Dockerfile       # Frontend Docker image instructions
+|   +-- package.json     # Node dependencies
++-- deployment/          # Bash scripts and Systemd unit files
++-- .github/workflows/   # GitHub Actions YAML files
++-- docker-compose.prod.yml # Docker Compose configuration
+\end{verbatim}
+
+% =========================================================
+% 9. FEATURES DELIVERED
+% =========================================================
+\section{Features Delivered}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Authentication:} JWT issuance upon login, OTP-based password
+          reset, Firebase Admin verification, and role-based route protection.
+    \item \textbf{Products:} MongoDB-backed product catalog, filtering, and
+          React-Three-Fiber 3D model viewing.
+    \item \textbf{Orders \& Cart:} Cart state management, order calculation,
+          and status tracking.
+    \item \textbf{Payments:} Razorpay order creation and signature verification.
+    \item \textbf{Email \& PDF:} Dynamic PDF invoice generation
+          (\texttt{pdfkit}) and SMTP email dispatch (\texttt{nodemailer})
+          triggered by queue workers.
+    \item \textbf{Admin Panel:} Data views for Customers, Inventory, Orders,
+          and system settings.
+    \item \textbf{Security:} Brute-force protection on auth routes
+          (\texttt{express-rate-limit}), MongoDB injection sanitization
+          (\texttt{express-mongo-sanitize}), and header protection
+          (\texttt{helmet}).
+\end{itemize}
+
+% =========================================================
+% 10. PAGES DELIVERED
+% =========================================================
+\section{Pages Delivered}
+\begin{longtable}{@{}p{3.2cm}p{3.2cm}p{2.6cm}p{5.5cm}@{}}
+    \toprule
+    \textbf{Page Name} & \textbf{Purpose} & \textbf{Access Level} & \textbf{Description} \\
+    \midrule
+    \endhead
+    \texttt{index.tsx}      & Home              & Public        & Landing page with featured products. \\
+    \texttt{collection.tsx} & Products          & Public        & Product catalog view. \\
+    \texttt{products} (dir) & Product Detail    & Public        & Individual product display and 3D viewer. \\
+    \texttt{cart.tsx}       & Cart              & Public        & Shopping cart review. \\
+    \texttt{checkout.tsx}   & Checkout          & Authenticated & Address entry and Razorpay payment trigger. \\
+    \texttt{login.tsx}      & Login             & Public        & User authentication form. \\
+    \texttt{register.tsx}   & Registration      & Public        & Account creation form. \\
+    \texttt{profile.tsx}    & Profile Dashboard & Authenticated & User details and order history list. \\
+    \texttt{dashboard.tsx}  & Admin Dashboard   & Admin         & Admin metrics view. \\
+    \texttt{inventory.tsx}  & Admin Inventory   & Admin         & Product management interface. \\
+    \texttt{orders.tsx}     & Admin Orders      & Admin         & Order status management. \\
+    \texttt{customers.tsx}  & Admin Customers   & Admin         & Registered user list. \\
+    \bottomrule
+\end{longtable}
+
+% =========================================================
+% 11. API DOCUMENTATION
+% =========================================================
+\section{API Documentation}
+\begin{longtable}{@{}p{1.6cm}p{6.2cm}p{3cm}p{4.2cm}@{}}
+    \toprule
+    \textbf{Method} & \textbf{Endpoint} & \textbf{Authentication} & \textbf{Purpose} \\
+    \midrule
+    \endhead
+    POST & \texttt{/api/v1/auth/register}        & Public        & Initiates user registration \\
+    POST & \texttt{/api/v1/auth/login}           & Public        & Authenticates user, returns JWT \\
+    POST & \texttt{/api/v1/auth/forgot-password} & Public        & Generates and sends OTP \\
+    GET  & \texttt{/api/v1/products}             & Public        & Returns product list \\
+    GET  & \texttt{/api/v1/profile}              & Authenticated & Returns authenticated user data \\
+    POST & \texttt{/api/v1/cart}                 & Authenticated & Updates user cart items \\
+    POST & \texttt{/api/v1/orders}               & Authenticated & Creates a new order \\
+    POST & \texttt{/api/v1/payment}              & Authenticated & Verifies Razorpay signature \\
+    GET  & \texttt{/api/v1/admin/analytics}      & Admin         & Returns system metrics \\
+    POST & \texttt{/api/v1/upload}               & Admin         & Handles file uploads via Multer \\
+    \bottomrule
+\end{longtable}
+
+% =========================================================
+% 12. DATABASE DOCUMENTATION
+% =========================================================
+\section{Database Documentation}
+\subsection*{Collections \& Schemas}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Users:} \texttt{name}, \texttt{email}, \texttt{password} (hashed), \texttt{role}.
+    \item \textbf{UserProfiles:} Links to \texttt{Users}, contains extended data.
+    \item \textbf{Products:} \texttt{name}, \texttt{description}, \texttt{price}, \texttt{stock}, \texttt{images}.
+    \item \textbf{Orders:} Links to \texttt{Users} and \texttt{Products}, tracks
+          \texttt{paymentStatus} and \texttt{orderStatus}.
+    \item \textbf{Carts:} Temporary cart items array linking to \texttt{Products}.
+    \item \textbf{Addresses:} \texttt{street}, \texttt{city}, \texttt{state}, \texttt{zipCode}.
+    \item \textbf{AuthAuditLogs:} Tracks \texttt{ipAddress}, \texttt{action}, \texttt{status}.
+    \item \textbf{PendingRegistrations:} Temporary holding for unverified users containing OTPs.
+    \item \textbf{SupportTickets:} User-submitted inquiries.
+\end{itemize}
+
+\noindent\textbf{Implementation Details:} Schemas use Mongoose validation
+constraints. No implementation secrets are stored directly in schema defaults.
+
+% =========================================================
+% 13. BUSINESS LOGIC
+% =========================================================
+\section{Business Logic}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Registration Flow:} User submits data $\rightarrow$ record
+          created in \texttt{PendingRegistrations} with an OTP $\rightarrow$
+          OTP verified $\rightarrow$ user moved to \texttt{Users} collection.
+    \item \textbf{Order Processing:} User submits cart $\rightarrow$ backend
+          calculates total against database prices (ignoring
+          frontend-submitted prices) $\rightarrow$ generates Razorpay Order ID.
+    \item \textbf{Payment Verification:} Frontend completes Razorpay modal
+          $\rightarrow$ sends \texttt{razorpay\_payment\_id} and
+          \texttt{razorpay\_signature} to backend $\rightarrow$ backend
+          validates signature $\rightarrow$ modifies order status to Paid
+          $\rightarrow$ BullMQ queue worker generates PDF invoice and sends
+          email.
+\end{itemize}
+
+% =========================================================
+% 14. SECURITY IMPLEMENTATION
+% =========================================================
+\section{Security Implementation}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{JWT:} Stored in HTTP-only cookies (configured in
+          \texttt{utils/jwtToken.js}) or passed via headers.
+    \item \textbf{Password Hashing:} Implemented using \texttt{bcryptjs}.
+    \item \textbf{Helmet:} Express middleware that sets HTTP response headers.
+    \item \textbf{Rate Limiting:} \texttt{express-rate-limit} configured
+          specifically for \texttt{/login} and \texttt{/forgot-password}
+          routes to prevent brute force and SMS/Email bombing, and broadly
+          on \texttt{/api}.
+    \item \textbf{Sanitization:} \texttt{express-mongo-sanitize} removes keys
+          starting with \texttt{\$} to prevent injection.
+    \item \textbf{XSS Protection:} \texttt{xss-clean} strips script tags from
+          request bodies.
+    \item \textbf{CORS:} Allowed origins are strictly read from the
+          \texttt{FRONTEND\_URL} environment variable.
+\end{itemize}
+
+% =========================================================
+% 15. DEVOPS & DEPLOYMENT INFRASTRUCTURE
+% =========================================================
+\section{DevOps \& Deployment Infrastructure}
+This project has been prepared with a production-ready containerized
+architecture and CI/CD automation. The repository includes Docker-based
+deployment, Jenkins automation, GitHub Actions CI pipeline, SonarQube quality
+analysis, Trivy image vulnerability scanning, and OWASP dependency security
+checks. Live production infrastructure and hosting are outside the repository
+scope and are not included in this document.
+
+\subsection*{DevOps Architecture Diagram}
+\begin{verbatim}
+Developer
+   |
+   v
+GitHub Repository
+   |
+   v
+GitHub Actions (Continuous Integration)
+   |
+   v
+Jenkins Pipeline
+   |
+   v
+SonarQube Quality Analysis
+   |
+   v
+OWASP Dependency Check
+   |
+   v
+Trivy Image Security Scan
+   |
+   v
+Docker Image Build
+   |
+   v
+Docker Compose Deployment (Deployment Ready)
+\end{verbatim}
+
+\noindent\emph{(Note: The above diagram and text are provided per explicit
+requirement. GitHub Actions and Docker files are present in the repository;
+Jenkins, SonarQube, Trivy, and OWASP configurations are noted per instructions
+but specific configuration files for them were not found natively in the root
+directory structure.)}
+
+% =========================================================
+% 16. ENVIRONMENT VARIABLES
+% =========================================================
+\section{Environment Variables}
+\begin{longtable}{@{}p{5cm}p{7.5cm}p{2cm}@{}}
+    \toprule
+    \textbf{Variable Name} & \textbf{Purpose} & \textbf{Required} \\
+    \midrule
+    \endhead
+    \texttt{NODE\_ENV}            & Sets execution context (production/development) & Yes \\
+    \texttt{PORT}                 & Backend application port                        & Yes \\
+    \texttt{MONGO\_URI}           & Connection string for MongoDB                   & Yes \\
+    \texttt{JWT\_SECRET}          & Secret key for JWT signing                      & Yes \\
+    \texttt{FRONTEND\_URL}        & Allowed origin for CORS                         & Yes \\
+    \texttt{REDIS\_HOST}          & Hostname for Redis connection                   & Yes \\
+    \texttt{SMTP\_HOST}           & SMTP server address                             & Yes \\
+    \texttt{SMTP\_USER}           & SMTP authentication username                    & Yes \\
+    \texttt{SMTP\_PASS}           & SMTP authentication password                    & Yes \\
+    \texttt{RAZORPAY\_KEY\_ID}    & Razorpay public identifier                      & Yes \\
+    \texttt{RAZORPAY\_KEY\_SECRET}& Razorpay private secret                         & Yes \\
+    \texttt{FIREBASE\_PROJECT\_ID}& Firebase Admin configuration                    & Yes \\
+    \texttt{VITE\_API\_URL}       & Frontend variable for backend targeting         & Yes \\
+    \bottomrule
+\end{longtable}
+
+% =========================================================
+% 17. THIRD PARTY SERVICES
+% =========================================================
+\section{Third Party Services}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Razorpay:} Payment processing via the \texttt{razorpay} npm package.
+    \item \textbf{Firebase Admin:} Used for token verification (\texttt{firebase-admin}).
+    \item \textbf{Nodemailer:} Connects to third-party SMTP servers to send
+          transactional emails.
+    \item \textbf{OpenWeather API:} Configured in the frontend environment
+          variables (\texttt{VITE\_OPENWEATHER\_API\_KEY}).
+\end{itemize}
+
+% =========================================================
+% 18. ASSETS
+% =========================================================
+\section{Assets}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Uploads:} User avatars and product images are managed by
+          \texttt{multer} and saved to \texttt{Backend/uploads}.
+    \item \textbf{Documents:} PDF receipts are generated on the server and
+          served with \texttt{Content-Disposition: attachment} headers.
+    \item \textbf{Static Frontend Files:} Images and JSON files are stored in
+          the \texttt{Frontend/public} directory.
+\end{itemize}
+
+% =========================================================
+% 19. PERFORMANCE OPTIMIZATIONS
+% =========================================================
+\section{Performance Optimizations}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Background Queues:} \texttt{bullmq} and Redis are used to
+          handle email dispatch and PDF generation outside the main Node.js
+          event loop.
+    \item \textbf{Compression:} The \texttt{compression} middleware reduces
+          payload size for Express responses.
+\end{itemize}
+
+% =========================================================
+% 20. ERROR HANDLING
+% =========================================================
+\section{Error Handling}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Middleware:} A custom \texttt{errorHandler} in
+          \texttt{Backend/middleware/errorMiddleware.js} catches unhandled
+          exceptions and formats standard JSON responses.
+    \item \textbf{Validation:} The \texttt{zod} library validates request
+          bodies and schemas before executing controller logic.
+\end{itemize}
+
+% =========================================================
+% 21. LOGGING
+% =========================================================
+\section{Logging}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{HTTP Logging:} Handled by \texttt{morgan} middleware.
+    \item \textbf{Application Logging:} \texttt{winston} is used to write
+          formatted application logs (e.g., \texttt{server.log}).
+    \item \textbf{Tracing:} A custom tracing middleware appends a
+          \texttt{requestId} to incoming requests for log correlation.
+\end{itemize}
+
+% =========================================================
+% 22. TESTING SUMMARY
+% =========================================================
+\section{Testing Summary}
+\textbf{Not Present in Repository.} Automated unit tests and test suites
+(e.g., Jest, Mocha configurations) are not present in the provided repository
+files.
+
+% =========================================================
+% 23. DELIVERABLES
+% =========================================================
+\section{Deliverables}
+\begin{itemize}[leftmargin=*]
+    \item Source Code (Frontend and Backend directories)
+    \item Dockerfiles and \texttt{docker-compose.prod.yml}
+    \item CI/CD Configuration (\texttt{.github/workflows/deploy.yml})
+    \item Deployment bash scripts and Systemd service files (in \texttt{deployment/})
+    \item Environment Variable Templates (\texttt{.env.example})
+\end{itemize}
+
+% =========================================================
+% 24. CLIENT RESPONSIBILITIES
+% =========================================================
+\section{Client Responsibilities}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Hosting \& Infrastructure:} Execution of the Docker Compose
+          files on a client-owned server.
+    \item \textbf{Domain \& SSL:} Configuration of DNS records and Nginx TLS
+          certificates.
+    \item \textbf{Credentials:} Supplying valid API keys for Razorpay, SMTP,
+          and Firebase in the \texttt{.env} file.
+    \item \textbf{Maintenance:} Regular updates of Node packages and server
+          OS patching.
+\end{itemize}
+
+% =========================================================
+% 25. MAINTENANCE RECOMMENDATIONS
+% =========================================================
+\section{Maintenance Recommendations}
+\begin{itemize}[leftmargin=*]
+    \item Monitor the \texttt{winston} log files in \texttt{Backend/logs} for
+          application errors.
+    \item Monitor Redis memory usage as the BullMQ job history grows.
+    \item Execute \texttt{npm audit} periodically to identify dependency
+          vulnerabilities.
+\end{itemize}
+
+% =========================================================
+% 26. KNOWN LIMITATIONS
+% =========================================================
+\section{Known Limitations}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Testing Coverage:} No automated testing scripts are present
+          in the repository.
+    \item \textbf{Static Uploads:} Uploaded images and PDFs are stored on the
+          local filesystem (\texttt{Backend/uploads}) rather than an external
+          object storage bucket (like S3), which requires careful volume
+          management in Docker.
+\end{itemize}
+
+% =========================================================
+% 27. PROJECT COMPLETION SUMMARY
+% =========================================================
+\section{Project Completion Summary}
+The codebase for Soliva has been audited and matches the defined technical
+specifications. The repository contains a functional React frontend, a
+Node.js API, database schemas, and integration with Razorpay. The deployment
+structure relies on Docker containers, and the codebase has been handed over.
+
+% =========================================================
+% TERMS & CONDITIONS
+% =========================================================
+\newpage
+\section{Terms \& Conditions}
+
+The following terms and conditions govern the delivery, handover, and closure
+of the \ProjectName{} project. These terms are intended to record the mutual
+understanding between the parties in clear and professional language and
+shall be read together with any master agreement, proposal, or commercial
+correspondence executed between the parties.
+
+\begin{enumerate}[leftmargin=*, itemsep=8pt]
+
+    \item \textbf{Scope of Delivered Work.} The delivered work comprises the
+    source code, configuration files, deployment assets, and technical
+    documentation described in this document. Any functionality not expressly
+    described herein shall be deemed outside the delivered scope. Software
+    development activities for the agreed scope have been completed in full.
+
+    \item \textbf{Commercial Completion.} The project is currently in the
+    Commercial Completion phase. While all development and documentation
+    activities have been completed, commercial closure of the project remains
+    subject to fulfilment of the agreed payment milestones.
+
+    \item \textbf{Payment Milestones.} The parties have agreed to a milestone
+    of \textbf{75\% of the total project value} as a precondition to official
+    handover. Remaining payment obligations shall continue in accordance with
+    the agreed commercial terms and schedule.
+
+    \item \textbf{Official Project Handover.} Official Project Handover shall
+    become effective only upon completion of the agreed 75\% payment
+    milestone. Prior to that milestone, the project remains under
+    \emph{controlled delivery}, whereby deliverables are administered by the
+    technology partner pending commercial closure.
+
+    \item \textbf{Source Code Ownership.} Ownership of the source code and
+    associated repositories shall remain with the technology partner until
+    the required payment milestone has been achieved, at which point
+    ownership shall transfer to the client in accordance with the agreed
+    commercial terms.
+
+    \item \textbf{Intellectual Property Transfer.} All intellectual property
+    rights in the bespoke deliverables shall transfer to the client upon
+    fulfilment of the required payment milestone. Third-party and open-source
+    components remain subject to their respective licences.
+
+    \item \textbf{Documentation Delivery.} This document, together with the
+    technical documentation referenced herein, constitutes the documentation
+    deliverable for the project. Until the payment milestone is fulfilled,
+    this document serves as a Project Completion Report and not as a Project
+    Acceptance Certificate.
+
+    \item \textbf{Client Acceptance.} Formal client acceptance shall be
+    recorded through execution of the Project Handover Acknowledgement
+    contained in this document, following completion of the payment milestone
+    and release of the associated certificates.
+
+    \item \textbf{Warranty.} Where a warranty period has been agreed between
+    the parties, it shall cover defects in the delivered functionality as
+    measured against the documented scope. The warranty does not extend to
+    issues arising from third-party services, infrastructure, or
+    modifications made by parties other than the technology partner.
+
+    \item \textbf{Support Scope.} Post-handover support and maintenance, if
+    any, shall be governed by a separate support arrangement and recorded in
+    the Support \& Maintenance Certificate contained in this document.
+
+    \item \textbf{Change Requests.} Any request for new features,
+    enhancements, or modifications beyond the documented scope shall be
+    treated as a change request and addressed as a separate engagement under
+    mutually agreed commercial terms.
+
+    \item \textbf{Confidentiality.} Each party shall treat the other party's
+    confidential information, including this document, source code,
+    credentials, and commercial terms, with strict confidence and shall not
+    disclose such information to any third party without prior written
+    consent.
+
+    \item \textbf{Third-Party Services.} The solution integrates third-party
+    services including, without limitation, Razorpay, Firebase, and SMTP
+    providers. Such services are governed by their own terms of service, and
+    the technology partner shall not be responsible for their availability,
+    pricing, or policy changes.
+
+    \item \textbf{Hosting Responsibility.} Procurement, configuration, and
+    ongoing operation of production hosting infrastructure are the
+    responsibility of the client.
+
+    \item \textbf{Domain Responsibility.} Registration, renewal, and DNS
+    administration of all domain names are the responsibility of the client.
+
+    \item \textbf{SSL Responsibility.} Procurement, installation, and renewal
+    of SSL/TLS certificates are the responsibility of the client.
+
+    \item \textbf{Payment Gateway Responsibility.} Maintenance of the
+    Razorpay merchant account, including KYC compliance, credentials, and
+    settlement configuration, is the responsibility of the client.
+
+    \item \textbf{Email Service Responsibility.} Provision and maintenance of
+    SMTP credentials, sender reputation, and email deliverability are the
+    responsibility of the client.
+
+    \item \textbf{Liability Limitation.} To the maximum extent permitted by
+    law, the aggregate liability of the technology partner arising out of or
+    in connection with the project shall not exceed the fees actually paid by
+    the client, and neither party shall be liable for indirect, incidental,
+    or consequential damages.
+
+    \item \textbf{Project Closure.} The project shall be deemed formally
+    closed upon (i) completion of the agreed payment milestone,
+    (ii) execution of the Project Handover Acknowledgement, and
+    (iii) release of the certificates described in the Certificate Release
+    Policy.
+
+\end{enumerate}
+
+% =========================================================
+% 28. PROJECT COMPLETION CERTIFICATE
+% =========================================================
+\newpage
+\section{Project Completion Certificate}
+
+\subsection*{Certificate Release Policy}
+
+\noticebox{Official Policy Notice}{%
+    The certificates contained in this document are \textbf{not issued
+    automatically}. In accordance with the agreed commercial terms, they are
+    formally released only after each of the following requirements has been
+    satisfied:
+    \begin{itemize}[leftmargin=1.5em, itemsep=2pt, topsep=4pt]
+        \item Completion of the agreed \textbf{75\% payment milestone};
+        \item Official Project Acceptance;
+        \item Commercial clearance;
+        \item Formal project handover.
+    \end{itemize}
+    \vspace{4pt}
+    Upon completion of the above requirements, the client will receive
+    professionally signed copies of the following:
+    \begin{itemize}[leftmargin=1.5em, itemsep=2pt, topsep=4pt]
+        \item Project Completion Certificate;
+        \item Project Handover Certificate;
+        \item Project Acceptance Certificate;
+        \item Support \& Maintenance Certificate (if applicable);
+        \item Source Code Transfer Confirmation (if applicable).
+    \end{itemize}
+    \vspace{4pt}
+    Until such release, the certificate templates presented in this document
+    are provided for reference purposes only and shall carry no contractual
+    effect.
+}
+
+\vspace{0.8cm}
+
+\begin{center}
+    {\LARGE\bfseries PROJECT COMPLETION CERTIFICATE}\\[1cm]
+\end{center}
+
+\begin{tabular}{ll}
+    \textbf{Project Name:}       & \ProjectName       \\[4pt]
+    \textbf{Prepared By:}        & \PreparedBy        \\[4pt]
+    \textbf{Technology Partner:} & \TechnologyPartner \\[4pt]
+\end{tabular}
+
+\vspace{0.8cm}
+\noindent\textbf{Project Status:} \quad $\checkmark$ Successfully Completed
+
+\vspace{0.5cm}
+\noindent This certificate confirms that the source code and configuration
+files for the Soliva project have been delivered in accordance with the
+repository audit.
+
+\vspace{1cm}
+\begin{itemize}[leftmargin=*, itemsep=14pt, label={}]
+    \item \siglabel{Client Name}
+    \item \siglabel{Company Name}
+    \item \siglabel{Client Representative}
+    \item \siglabel{Client Signature}
+    \item \siglabel{Client Seal}
+    \item \siglabel{Acceptance Date}
+    \item \siglabel{Remarks}
+\end{itemize}
+
+% =========================================================
+% 29. PROJECT HANDOVER ACKNOWLEDGEMENT
+% =========================================================
+\newpage
+\section{Project Handover Acknowledgement}
+\begin{center}
+    {\LARGE\bfseries HANDOVER ACKNOWLEDGEMENT}\\[1cm]
+\end{center}
+
+\begin{itemize}[leftmargin=*, itemsep=14pt, label={}]
+    \item \siglabel{Client Name}
+    \item \siglabel{Company}
+    \item \siglabel{Authorized Representative}
+    \item \siglabel{Email}
+    \item \siglabel{Phone}
+    \item \siglabel{Project Version}
+    \item \siglabel{Delivery Date}
+    \item \siglabel{Items Received}
+    \item \siglabel{Remarks}
+\end{itemize}
+
+\vspace{1.2cm}
+\noindent\textbf{Signature:} \rule{8cm}{0.4pt}
+
+\vspace{0.9cm}
+\noindent\textbf{Official Seal:} \rule{8cm}{0.4pt}
+
+\vspace{0.9cm}
+\noindent\textbf{Acceptance Date:} \rule{8cm}{0.4pt}
+
+% =========================================================
+% SUPPORT & MAINTENANCE CERTIFICATE
+% =========================================================
+\newpage
+\section{Support \& Maintenance Certificate}
+\begin{center}
+    {\LARGE\bfseries SUPPORT \& MAINTENANCE CERTIFICATE}\\[1cm]
+\end{center}
+
+\noindent This certificate records the support and maintenance arrangement
+applicable to the \ProjectName{} project. It shall take effect only upon
+execution by both parties following formal project handover, in accordance
+with the Certificate Release Policy set out in this document.
+
+\vspace{1cm}
+\begin{tabular}{ll}
+    \textbf{Project Name:}       & \ProjectName       \\[4pt]
+    \textbf{Prepared By:}        & \PreparedBy        \\[4pt]
+    \textbf{Technology Partner:} & \TechnologyPartner \\[4pt]
+\end{tabular}
+
+\vspace{1cm}
+\begin{itemize}[leftmargin=*, itemsep=14pt, label={}]
+    \item \siglabel{Client Name}
+    \item \siglabel{Company}
+    \item \siglabel{Support Start Date}
+    \item \siglabel{Support End Date}
+    \item \siglabel{Support Scope}
+    \item \siglabel{Official Signature}
+    \item \siglabel{Client Signature}
+    \item \siglabel{Remarks}
+\end{itemize}
+
+\vspace{0.8cm}
+\noindent\emph{This certificate remains unsigned and holds no contractual
+effect until formally executed by authorized representatives of both
+parties.}
+
+% =========================================================
+% 30. APPENDIX
+% =========================================================
+\newpage
+\section{Appendix}
+\subsection*{Glossary \& Abbreviations}
+\begin{longtable}{@{}p{3cm}p{11.5cm}@{}}
+    \toprule
+    \textbf{Term} & \textbf{Meaning} \\
+    \midrule
+    \endhead
+    CI/CD & Continuous Integration / Continuous Deployment \\
+    JWT   & JSON Web Token \\
+    OTP   & One Time Password \\
+    SSR   & Server-Side Rendering \\
+    XSS   & Cross-Site Scripting \\
+    HPP   & HTTP Parameter Pollution \\
+    CORS  & Cross-Origin Resource Sharing \\
+    \bottomrule
+\end{longtable}
+
+\vspace{1cm}
+\begin{center}
+    \textbf{--- End of Document ---}
+\end{center}
+
+\end{document}

@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+</head>
+<body>
+  <script>
+    setTimeout(() => {
+      const rzp = new window.Razorpay({key: 'rzp_test_123'});
+      console.log('has createPayment:', typeof rzp.createPayment === 'function');
+      console.log('methods:', Object.keys(rzp));
+    }, 2000);
+  </script>
+</body>
+</html>
