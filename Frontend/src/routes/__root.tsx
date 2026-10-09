@@ -10,6 +10,7 @@ import {
 import { Toaster } from "sonner";
 import { TopProgressBar } from "@/design-system/loading/TopProgressBar";
 import { IntroLoader } from "@/components/IntroLoader";
+import { AnalyticsTracker } from "@/components/AnalyticsTracker";
 import { appLoader } from "@/design-system";
 
 import appCss from "../styles.css?url";
@@ -172,6 +173,7 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
+      <AnalyticsTracker />
       <TopProgressBar />
       <Outlet />
       <Toaster position="top-center" richColors closeButton />

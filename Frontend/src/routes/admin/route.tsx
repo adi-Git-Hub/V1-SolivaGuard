@@ -13,7 +13,7 @@ export const Route = createFileRoute("/admin")({
   component: AdminLayout,
 });
 
-function AdminLayout() {
+export function AdminLayout() {
   const session  = useSession();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);

@@ -238,6 +238,9 @@ export const adminKeys = {
   inventory: (q?: object) => ["admin", "inventory", q ?? {}] as const,
   payments:  (q?: object) => ["admin", "payments", q ?? {}] as const,
   analytics: () => ["admin", "analytics"] as const,
+  analyticsReach: (q?: object) => ["admin", "analytics", "reach", q ?? {}] as const,
+  analyticsVisitors: (q?: object) => ["admin", "analytics", "visitors", q ?? {}] as const,
+  analyticsVisitorDetail: (id?: string | null) => ["admin", "analytics", "visitor", id ?? ""] as const,
 };
 
 /* ─── Dashboard ──────────────────────────────────────────────────────── */
@@ -500,5 +503,148 @@ export function useAdminAnalytics() {
       const res = await api.get<Env<AdminAnalytics>>("/admin/analytics");
       return res.data;
     },
+  });
+}
+
+/* ─── Website Reach & Visitor Activity Analytics ─────────────────────── */
+export type ReachAnalyticsData = {
+  period: string;
+  rangeStart: string;
+  rangeEnd: string;
+  totalVisitors?: number;
+  totalPageViews: number;
+  uniqueVisitors: number;
+  todayVisitors: number;
+  activeVisitors: number;
+  trafficTrend: Array<{
+    date: string;
+    pageViews: number;
+    uniqueVisitors: number;
+  }>;
+  topPages: Array<{
+    path: string;
+    views: number;
+    uniqueVisitors: number;
+  }>;
+  trafficSources: Array<{
+    source: string;
+    count: number;
+    percentage: number;
+  }>;
+  deviceBreakdown: Array<{
+    device: string;
+    count: number;
+    percentage: number;
+  }>;
+};
+
+export type VisitorActivityItem = {
+  visitorId: string;
+  pseudonym: string;
+  visitorType: "Logged-in User" | "Guest";
+  user: { _id: string; name: string; email: string } | null;
+  lastVisitedPage: string;
+  lastVisitTime: string;
+  firstVisitTime: string;
+  trafficSource: string;
+  deviceType: string;
+  browser: string;
+  os: string;
+  totalPageViews: number;
+};
+
+export type VisitorActivityResponse = {
+  visitors: VisitorActivityItem[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+};
+
+export type VisitorDetailData = {
+  visitorId: string;
+  pseudonym: string;
+  visitorType: "Logged-in User" | "Guest";
+  user: { _id: string; name: string; email: string } | null;
+  totalTrackedEvents: number;
+  history: Array<{
+    _id: string;
+    path: string;
+    title: string;
+    referrer: string;
+    trafficSource: string;
+    utm?: {
+      source?: string;
+      medium?: string;
+      campaign?: string;
+      term?: string;
+      content?: string;
+    };
+    deviceType: string;
+    browser: string;
+    os: string;
+    isSessionStart: boolean;
+    timestamp: string;
+  }>;
+};
+
+export function useReachAnalytics(params?: { period?: string; startDate?: string; endDate?: string }) {
+  return useQuery({
+    queryKey: adminKeys.analyticsReach(params),
+    queryFn: async () => {
+      const search = new URLSearchParams();
+      if (params?.period) search.set("period", params.period);
+      if (params?.startDate) search.set("startDate", params.startDate);
+      if (params?.endDate) search.set("endDate", params.endDate);
+      const res = await api.get<Env<ReachAnalyticsData>>(`/admin/analytics/reach?${search.toString()}`);
+      return res.data;
+    },
+    staleTime: 30_000,
+  });
+}
+
+export function useVisitorActivity(params: {
+  search?: string;
+  visitorType?: string;
+  trafficSource?: string;
+  deviceType?: string;
+  startDate?: string;
+  endDate?: string;
+  page?: number;
+  limit?: number;
+}) {
+  return useQuery({
+    queryKey: adminKeys.analyticsVisitors(params),
+    queryFn: async () => {
+      const search = new URLSearchParams();
+      if (params.search) search.set("search", params.search);
+      if (params.visitorType && params.visitorType !== "all") search.set("visitorType", params.visitorType);
+      if (params.trafficSource && params.trafficSource !== "all") search.set("trafficSource", params.trafficSource);
+      if (params.deviceType && params.deviceType !== "all") search.set("deviceType", params.deviceType);
+      if (params.startDate) search.set("startDate", params.startDate);
+      if (params.endDate) search.set("endDate", params.endDate);
+      if (params.page) search.set("page", String(params.page));
+      if (params.limit) search.set("limit", String(params.limit));
+      const res = await api.get<Env<VisitorActivityResponse>>(`/admin/analytics/visitors?${search.toString()}`);
+      return res.data;
+    },
+    staleTime: 15_000,
+  });
+}
+
+export function useVisitorDetail(visitorId: string | null) {
+  return useQuery({
+    queryKey: adminKeys.analyticsVisitorDetail(visitorId),
+    queryFn: async () => {
+      if (!visitorId) return null;
+      const res = await api.get<Env<VisitorDetailData>>(
+        `/admin/analytics/visitors/${encodeURIComponent(visitorId)}`,
+      );
+      return res.data;
+    },
+    enabled: Boolean(visitorId),
+    staleTime: 30_000,
   });
 }

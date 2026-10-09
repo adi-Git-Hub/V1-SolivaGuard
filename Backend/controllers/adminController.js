@@ -1,7 +1,9 @@
+const mongoose = require('mongoose');
 const User = require('../models/userModel');
 const Order = require('../models/orderModel');
 const Product = require('../models/productModel');
 const Address = require('../models/addressModel');
+const AuthAuditLog = require('../models/authAuditLogModel');
 const catchAsyncErrors = require('../middleware/catchAsyncErrors');
 const sendResponse = require('../utils/sendResponse');
 const ErrorHandler = require('../utils/errorHandler');
@@ -21,6 +23,13 @@ const CUSTOMER_SORT_FIELDS = {
   lastOrder:     'lastOrder',
   avgOrderValue: 'avgOrderValue',
 };
+
+// Base filter for every customer-facing admin view. Accounts that were
+// soft-deleted (self-service via authService.deleteAccount, or by an admin
+// bulk delete) keep their row so their orders stay attributable, but they are
+// anonymized tombstones and must never appear in the admin customer list,
+// the summary cards, or the CSV export.
+const LIVE_CUSTOMER_MATCH = { role: 'user', status: { $ne: 'deleted' } };
 
 // Sensitive user fields never returned to the admin client.
 const CUSTOMER_PRIVATE_FIELDS = {
@@ -87,13 +96,14 @@ exports.getDashboardStats = catchAsyncErrors(async (req, res, next) => {
   const totalOrders = await Order.countDocuments();
   const totalProducts = await Product.countDocuments();
 
-  const orders = await Order.find().lean();
-  let totalRevenue = 0;
-  orders.forEach((order) => {
-    if (order.paymentInfo && order.paymentInfo.status && order.paymentInfo.status.toLowerCase() === 'paid') {
-      totalRevenue += order.totalPrice;
-    }
-  });
+  // Sum revenue in the database instead of pulling every order into memory —
+  // the old `Order.find().lean()` loaded the whole collection just to add up a
+  // single number, which grows unbounded as orders accumulate.
+  const [revenueAgg] = await Order.aggregate([
+    { $match: { $expr: { $eq: [{ $toLower: '$paymentInfo.status' }, 'paid'] } } },
+    { $group: { _id: null, total: { $sum: '$totalPrice' } } },
+  ]);
+  const totalRevenue = revenueAgg ? revenueAgg.total : 0;
 
   const recentOrders = await Order.find()
     .sort({ createdAt: -1 })
@@ -159,8 +169,8 @@ exports.getCustomerStats = catchAsyncErrors(async (req, res, next) => {
 
   const [totalCustomers, blockedCustomers, activeAgg, returningAgg, revenueAgg, highValueAgg] =
     await Promise.all([
-      User.countDocuments({ role: 'user' }),
-      User.countDocuments({ role: 'user', status: 'blocked' }),
+      User.countDocuments(LIVE_CUSTOMER_MATCH),
+      User.countDocuments({ ...LIVE_CUSTOMER_MATCH, status: 'blocked' }),
       // Active = distinct customers who ordered within the active window.
       Order.aggregate([
         { $match: { createdAt: { $gte: activeSince } } },
@@ -215,7 +225,7 @@ exports.getAdminCustomers = catchAsyncErrors(async (req, res, next) => {
   const activeSince = new Date(Date.now() - ACTIVE_WINDOW_DAYS * 24 * 60 * 60 * 1000);
 
   // Base match — fields available directly on the user document.
-  const baseMatch = { role: 'user' };
+  const baseMatch = { ...LIVE_CUSTOMER_MATCH };
   if (keyword) {
     const safe = escapeRegex(keyword);
     baseMatch.$or = [
@@ -322,7 +332,7 @@ exports.exportCustomers = catchAsyncErrors(async (req, res, next) => {
   const activeSince = new Date(Date.now() - ACTIVE_WINDOW_DAYS * 24 * 60 * 60 * 1000);
 
   const rows = await User.aggregate([
-    { $match: { role: 'user' } },
+    { $match: LIVE_CUSTOMER_MATCH },
     ...customerMetricStages(activeSince),
     { $sort: { createdAt: -1 } },
     {
@@ -355,6 +365,199 @@ exports.exportCustomers = catchAsyncErrors(async (req, res, next) => {
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
   res.setHeader('Content-Disposition', `attachment; filename="soliva-customers-${iso(new Date())}.csv"`);
   return res.status(200).send(csv);
+});
+
+/* ── Bulk delete ────────────────────────────────────────────────────────
+   Multi-select delete for the admin customer and order lists. Both endpoints
+   are deliberately partial-success: every id is judged on its own and the
+   response reports exactly what was removed and what was refused (and why),
+   so one protected record never fails the whole batch silently.          */
+
+// Hard cap per request — a runaway or replayed client can never wipe a table
+// in a single call, and the per-id loop stays bounded.
+const BULK_DELETE_MAX = 100;
+
+// An order in one of these states has ALREADY had its stock returned to the
+// catalogue (orderService does that on the cancel/refund transition). Deleting
+// one must NOT restock again or inventory silently inflates.
+const STOCK_ALREADY_RELEASED = ['cancelled', 'refunded'];
+
+// Validate an { ids: [...] } payload into a unique list of ObjectId strings.
+function parseBulkIds(body) {
+  const raw = Array.isArray(body?.ids) ? body.ids : null;
+  if (!raw || raw.length === 0) {
+    throw new ErrorHandler('Provide an "ids" array containing at least one id', 400);
+  }
+  if (raw.length > BULK_DELETE_MAX) {
+    throw new ErrorHandler(`Cannot delete more than ${BULK_DELETE_MAX} records in one request`, 400);
+  }
+  const ids = [...new Set(raw.map(String))];
+  const invalid = ids.filter((id) => !mongoose.Types.ObjectId.isValid(id));
+  if (invalid.length) {
+    throw new ErrorHandler(`Invalid id(s): ${invalid.join(', ')}`, 400);
+  }
+  return ids;
+}
+
+// Scrub every piece of personal data off a user in place, leaving an
+// anonymized tombstone. Mirrors authService.deleteAccount so a customer
+// deleted by an admin ends up in exactly the same shape as one who deleted
+// their own account — the row survives purely so their orders and invoices
+// remain attributable and auditable.
+function anonymizeCustomer(user) {
+  const idStr = String(user._id);
+  user.status = 'deleted';
+  user.deletedAt = new Date();
+  user.name = 'Deleted User';
+  // email/username are required + unique → per-id sentinel that still passes
+  // the model's email regex. phone/googleId are sparse-unique → unset.
+  user.email = `deleted.${idStr}@deleted.co`;
+  user.username = `deleted_${idStr}`;
+  user.phoneNumber = undefined;
+  user.googleId = undefined;
+  user.avatarUrl = null;
+  user.isVerified = false;
+  user.sessions = [];
+  user.emailOTP = undefined;
+  user.otpExpire = undefined;
+  user.forgotPasswordOTP = undefined;
+  user.forgotPasswordExpire = undefined;
+  user.lastLoginIP = null;
+  user.lastLoginISP = null;
+  user.lastLoginCity = null;
+  user.lastLoginState = null;
+  user.lastLoginCountry = null;
+  user.lastLatitude = null;
+  user.lastLongitude = null;
+  user.areaName = null;
+  user.subLocality = null;
+  user.locality = null;
+  user.deviceInfo = null;
+  user.browserInfo = null;
+  user.osInfo = null;
+}
+
+// @desc    Bulk delete customers (admin) — soft delete + anonymize
+// @route   POST /api/v1/admin/customers/bulk-delete
+// @access  Private/Admin
+exports.bulkDeleteCustomers = catchAsyncErrors(async (req, res, next) => {
+  const ids = parseBulkIds(req.body);
+  const requesterId = String(req.user._id);
+
+  const users = await User.find({ _id: { $in: ids } });
+  const byId = new Map(users.map((u) => [String(u._id), u]));
+
+  const deleted = [];
+  const skipped = [];
+
+  for (const id of ids) {
+    const user = byId.get(id);
+    if (!user) {
+      skipped.push({ id, reason: 'Customer not found' });
+      continue;
+    }
+    if (user.role === 'admin') {
+      skipped.push({ id, name: user.name, reason: 'Admin accounts cannot be deleted' });
+      continue;
+    }
+    if (id === requesterId) {
+      skipped.push({ id, name: user.name, reason: 'You cannot delete your own account' });
+      continue;
+    }
+    if (user.status === 'deleted') {
+      skipped.push({ id, name: user.name, reason: 'Already deleted' });
+      continue;
+    }
+
+    const label = user.name;
+    anonymizeCustomer(user);
+    await user.save({ validateBeforeSave: false });
+
+    // Their saved addresses are pure PII with no accounting value — unlike
+    // orders, nothing references them once the account is gone.
+    await Address.deleteMany({ user: user._id });
+
+    await AuthAuditLog.create({
+      userId: user._id,
+      action: 'account_deleted',
+      status: 'success',
+      message: `Deleted by admin ${requesterId} via admin panel bulk delete`,
+    });
+
+    deleted.push({ id, name: label });
+  }
+
+  return sendResponse(res, {
+    message:
+      deleted.length === 0
+        ? 'No customers were deleted'
+        : `${deleted.length} customer${deleted.length === 1 ? '' : 's'} deleted`,
+    data: { deletedCount: deleted.length, deleted, skipped },
+  });
+});
+
+// @desc    Bulk delete orders (admin) — permanent, money-bearing orders refused
+// @route   POST /api/v1/admin/orders/bulk-delete
+// @access  Private/Admin
+exports.bulkDeleteOrders = catchAsyncErrors(async (req, res, next) => {
+  const ids = parseBulkIds(req.body);
+
+  const orders = await Order.find({ _id: { $in: ids } });
+  const byId = new Map(orders.map((o) => [String(o._id), o]));
+
+  const deleted = [];
+  const skipped = [];
+  let restockedItems = 0;
+
+  for (const id of ids) {
+    const order = byId.get(id);
+    const ref = `#${id.slice(-8).toUpperCase()}`;
+
+    if (!order) {
+      skipped.push({ id, ref, reason: 'Order not found' });
+      continue;
+    }
+    // ── Money guards. An order that took a rupee, or that produced a tax
+    // document, is a financial record we are required to retain. ──────────
+    if (order.paymentInfo?.status === 'paid') {
+      skipped.push({ id, ref, reason: 'Payment was captured — financial record must be retained' });
+      continue;
+    }
+    if (Order.PAID_IMPLYING_STATUSES.includes(order.orderStatus)) {
+      skipped.push({ id, ref, reason: `Status "${order.orderStatus}" implies payment was taken` });
+      continue;
+    }
+    if (order.invoiceNumber || order.invoiceUrl || order.receiptNumber || order.receiptUrl) {
+      skipped.push({ id, ref, reason: 'An invoice/receipt was issued for this order' });
+      continue;
+    }
+    if (order.refund?.status && order.refund.status !== 'not_applicable') {
+      skipped.push({ id, ref, reason: `Refund is "${order.refund.status}"` });
+      continue;
+    }
+
+    // Still-open orders are holding catalogue stock that was decremented at
+    // creation. Give it back before the row disappears, or the units are lost.
+    if (!STOCK_ALREADY_RELEASED.includes(order.orderStatus)) {
+      for (const item of order.orderItems) {
+        if (!item.product) continue; // synthetic/showcase ref — nothing to restock
+        await Product.findByIdAndUpdate(item.product, { $inc: { stock: item.quantity } });
+        restockedItems += item.quantity;
+      }
+    }
+
+    await order.deleteOne();
+    deleted.push({ id, ref });
+  }
+
+  return sendResponse(res, {
+    message:
+      deleted.length === 0
+        ? 'No orders were deleted'
+        : `${deleted.length} order${deleted.length === 1 ? '' : 's'} deleted` +
+          (restockedItems > 0 ? ` · ${restockedItems} unit(s) returned to stock` : ''),
+    data: { deletedCount: deleted.length, restockedItems, deleted, skipped },
+  });
 });
 
 // @desc    Get inventory (admin) — products with stock info

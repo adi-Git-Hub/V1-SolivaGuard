@@ -10,10 +10,12 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SolivaAdminRouteImport } from './routes/soliva-admin'
+import { Route as SvB27d3506ceRouteRouteImport } from './routes/sv-b27d3506ce/route'
 import { Route as AdminRouteRouteImport } from './routes/admin/route'
 import { Route as PublicRouteRouteImport } from './routes/_public/route'
 import { Route as AuthRouteRouteImport } from './routes/_auth/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as SvB27d3506ceAnalyticsRouteImport } from './routes/sv-b27d3506ce/analytics'
 import { Route as AdminSettingsRouteImport } from './routes/admin/settings'
 import { Route as AdminProductsRouteImport } from './routes/admin/products'
 import { Route as AdminPaymentsRouteImport } from './routes/admin/payments'
@@ -51,6 +53,11 @@ const SolivaAdminRoute = SolivaAdminRouteImport.update({
   path: '/soliva-admin',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SvB27d3506ceRouteRoute = SvB27d3506ceRouteRouteImport.update({
+  id: '/sv-b27d3506ce',
+  path: '/sv-b27d3506ce',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminRouteRoute = AdminRouteRouteImport.update({
   id: '/admin',
   path: '/admin',
@@ -68,6 +75,11 @@ const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const SvB27d3506ceAnalyticsRoute = SvB27d3506ceAnalyticsRouteImport.update({
+  id: '/analytics',
+  path: '/analytics',
+  getParentRoute: () => SvB27d3506ceRouteRoute,
 } as any)
 const AdminSettingsRoute = AdminSettingsRouteImport.update({
   id: '/settings',
@@ -230,6 +242,7 @@ const PublicProfileOrdersIdRoute = PublicProfileOrdersIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteRouteWithChildren
+  '/sv-b27d3506ce': typeof SvB27d3506ceRouteRouteWithChildren
   '/soliva-admin': typeof SolivaAdminRoute
   '/forgot-password': typeof AuthForgotPasswordRoute
   '/login': typeof AuthLoginRoute
@@ -254,6 +267,7 @@ export interface FileRoutesByFullPath {
   '/admin/payments': typeof AdminPaymentsRoute
   '/admin/products': typeof AdminProductsRouteWithChildren
   '/admin/settings': typeof AdminSettingsRoute
+  '/sv-b27d3506ce/analytics': typeof SvB27d3506ceAnalyticsRoute
   '/products/$slug': typeof PublicProductsSlugRoute
   '/track/$orderId': typeof PublicTrackOrderIdRoute
   '/admin/customers/$customerId': typeof AdminCustomersCustomerIdRoute
@@ -266,6 +280,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteRouteWithChildren
+  '/sv-b27d3506ce': typeof SvB27d3506ceRouteRouteWithChildren
   '/soliva-admin': typeof SolivaAdminRoute
   '/forgot-password': typeof AuthForgotPasswordRoute
   '/login': typeof AuthLoginRoute
@@ -289,6 +304,7 @@ export interface FileRoutesByTo {
   '/admin/orders': typeof AdminOrdersRouteWithChildren
   '/admin/payments': typeof AdminPaymentsRoute
   '/admin/settings': typeof AdminSettingsRoute
+  '/sv-b27d3506ce/analytics': typeof SvB27d3506ceAnalyticsRoute
   '/products/$slug': typeof PublicProductsSlugRoute
   '/track/$orderId': typeof PublicTrackOrderIdRoute
   '/admin/customers/$customerId': typeof AdminCustomersCustomerIdRoute
@@ -304,6 +320,7 @@ export interface FileRoutesById {
   '/_auth': typeof AuthRouteRouteWithChildren
   '/_public': typeof PublicRouteRouteWithChildren
   '/admin': typeof AdminRouteRouteWithChildren
+  '/sv-b27d3506ce': typeof SvB27d3506ceRouteRouteWithChildren
   '/soliva-admin': typeof SolivaAdminRoute
   '/_auth/forgot-password': typeof AuthForgotPasswordRoute
   '/_auth/login': typeof AuthLoginRoute
@@ -328,6 +345,7 @@ export interface FileRoutesById {
   '/admin/payments': typeof AdminPaymentsRoute
   '/admin/products': typeof AdminProductsRouteWithChildren
   '/admin/settings': typeof AdminSettingsRoute
+  '/sv-b27d3506ce/analytics': typeof SvB27d3506ceAnalyticsRoute
   '/_public/products/$slug': typeof PublicProductsSlugRoute
   '/_public/track/$orderId': typeof PublicTrackOrderIdRoute
   '/admin/customers/$customerId': typeof AdminCustomersCustomerIdRoute
@@ -342,6 +360,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/admin'
+    | '/sv-b27d3506ce'
     | '/soliva-admin'
     | '/forgot-password'
     | '/login'
@@ -366,6 +385,7 @@ export interface FileRouteTypes {
     | '/admin/payments'
     | '/admin/products'
     | '/admin/settings'
+    | '/sv-b27d3506ce/analytics'
     | '/products/$slug'
     | '/track/$orderId'
     | '/admin/customers/$customerId'
@@ -378,6 +398,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/admin'
+    | '/sv-b27d3506ce'
     | '/soliva-admin'
     | '/forgot-password'
     | '/login'
@@ -401,6 +422,7 @@ export interface FileRouteTypes {
     | '/admin/orders'
     | '/admin/payments'
     | '/admin/settings'
+    | '/sv-b27d3506ce/analytics'
     | '/products/$slug'
     | '/track/$orderId'
     | '/admin/customers/$customerId'
@@ -415,6 +437,7 @@ export interface FileRouteTypes {
     | '/_auth'
     | '/_public'
     | '/admin'
+    | '/sv-b27d3506ce'
     | '/soliva-admin'
     | '/_auth/forgot-password'
     | '/_auth/login'
@@ -439,6 +462,7 @@ export interface FileRouteTypes {
     | '/admin/payments'
     | '/admin/products'
     | '/admin/settings'
+    | '/sv-b27d3506ce/analytics'
     | '/_public/products/$slug'
     | '/_public/track/$orderId'
     | '/admin/customers/$customerId'
@@ -454,6 +478,7 @@ export interface RootRouteChildren {
   AuthRouteRoute: typeof AuthRouteRouteWithChildren
   PublicRouteRoute: typeof PublicRouteRouteWithChildren
   AdminRouteRoute: typeof AdminRouteRouteWithChildren
+  SvB27d3506ceRouteRoute: typeof SvB27d3506ceRouteRouteWithChildren
   SolivaAdminRoute: typeof SolivaAdminRoute
 }
 
@@ -464,6 +489,13 @@ declare module '@tanstack/react-router' {
       path: '/soliva-admin'
       fullPath: '/soliva-admin'
       preLoaderRoute: typeof SolivaAdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sv-b27d3506ce': {
+      id: '/sv-b27d3506ce'
+      path: '/sv-b27d3506ce'
+      fullPath: '/sv-b27d3506ce'
+      preLoaderRoute: typeof SvB27d3506ceRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin': {
@@ -493,6 +525,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/sv-b27d3506ce/analytics': {
+      id: '/sv-b27d3506ce/analytics'
+      path: '/analytics'
+      fullPath: '/sv-b27d3506ce/analytics'
+      preLoaderRoute: typeof SvB27d3506ceAnalyticsRouteImport
+      parentRoute: typeof SvB27d3506ceRouteRoute
     }
     '/admin/settings': {
       id: '/admin/settings'
@@ -846,11 +885,23 @@ const AdminRouteRouteWithChildren = AdminRouteRoute._addFileChildren(
   AdminRouteRouteChildren,
 )
 
+interface SvB27d3506ceRouteRouteChildren {
+  SvB27d3506ceAnalyticsRoute: typeof SvB27d3506ceAnalyticsRoute
+}
+
+const SvB27d3506ceRouteRouteChildren: SvB27d3506ceRouteRouteChildren = {
+  SvB27d3506ceAnalyticsRoute: SvB27d3506ceAnalyticsRoute,
+}
+
+const SvB27d3506ceRouteRouteWithChildren =
+  SvB27d3506ceRouteRoute._addFileChildren(SvB27d3506ceRouteRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthRouteRoute: AuthRouteRouteWithChildren,
   PublicRouteRoute: PublicRouteRouteWithChildren,
   AdminRouteRoute: AdminRouteRouteWithChildren,
+  SvB27d3506ceRouteRoute: SvB27d3506ceRouteRouteWithChildren,
   SolivaAdminRoute: SolivaAdminRoute,
 }
 export const routeTree = rootRouteImport

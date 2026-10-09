@@ -91,6 +91,11 @@ app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" }
 }));
 
+// Cookie parsing must run before any auth-guarded mount below: isAuthenticatedUser
+// reads req.cookies.accessToken, and without the parser that object is undefined,
+// which previously made /admin/queues throw a 500 instead of a clean 401.
+app.use(cookieParser());
+
 // Bull Board Dashboard (Protected)
 app.use('/api/v1/admin/queues', isAuthenticatedUser, authorizeRoles('admin'), bullBoardAdapter.getRouter());
 
@@ -127,7 +132,6 @@ app.use(express.json({
   }
 }));
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
-app.use(cookieParser());
 
 // Static folder for uploads. Invoice/receipt PDFs are forced to download with
 // a clean filename (Content-Disposition: attachment) so the email + mobile
@@ -188,6 +192,7 @@ const uploadRoutes = require('./routes/uploadRoutes');
 const paymentRoutes = require('./routes/paymentRoutes');
 const systemRoutes = require('./routes/systemRoutes');
 const contactRoutes = require('./routes/contactRoutes');
+const analyticsRoutes = require('./routes/analyticsRoutes');
 
 // API Routes
 app.use('/api/v1/auth', authRoutes);
@@ -202,6 +207,7 @@ app.use('/api/v1/upload', uploadRoutes);
 app.use('/api/v1/payment', paymentRoutes);
 app.use('/api/v1/system', systemRoutes);
 app.use('/api/v1/contact', contactRoutes);
+app.use('/api/v1/analytics', analyticsRoutes);
 
 // Root Endpoint
 app.get('/', (req, res) => {
